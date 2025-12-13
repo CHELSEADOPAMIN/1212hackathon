@@ -150,10 +150,7 @@ export default function ProcessTrackerPage() {
                        <h2 className="text-2xl font-bold">{candidate.name}</h2>
                        <p className="text-slate-500">{candidate.role}</p>
                      </div>
-                     <div className="flex flex-col items-end">
-                       <span className="text-3xl font-bold text-emerald-600">{candidate.interviewScore}/100</span>
-                       <span className="text-xs text-slate-400">AI Score</span>
-                     </div>
+                     {/* Score removed per request */}
                    </div>
 
                    <div className="space-y-4 mb-8">

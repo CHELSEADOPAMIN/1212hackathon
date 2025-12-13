@@ -19,15 +19,22 @@ export default function LandingPage() {
           </h1>
 
           <p className="text-lg text-muted-foreground">
-            不再海投简历。让 AI 根据你的真实代码和经历，自动匹配前 1% 的机会。
+            Stop spamming resumes. Let AI match you with top 1% opportunities based on your real code and experience.
           </p>
 
-          <Link href="/candidate/onboarding">
-            <Button size="lg" className="text-lg px-8 py-6 rounded-full shadow-lg hover:shadow-xl transition-all">
-              开始 AI 评估
-              <Sparkles className="ml-2 h-5 w-5" />
-            </Button>
-          </Link>
+          <div className="flex flex-col gap-4 w-full max-w-xs">
+            <Link href="/candidate/onboarding" className="w-full">
+              <Button size="lg" className="w-full text-lg px-8 py-6 rounded-full shadow-lg hover:shadow-xl transition-all">
+                Start Assessment
+                <Sparkles className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
+            <Link href="/candidate/dashboard" className="w-full">
+              <Button variant="ghost" className="w-full text-slate-500 hover:text-slate-900">
+                Already have an account? Sign In
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -45,12 +52,12 @@ export default function LandingPage() {
           </h1>
 
           <p className="text-lg text-muted-foreground">
-            竞价招聘。看到真实技能评分，像交易股票一样竞拍顶级人才。
+            Hire like trading stocks. See real skill scores and bid for top talent transparently.
           </p>
 
-          <Link href="/company/discover">
+          <Link href="/company/jobs">
             <Button variant="outline" size="lg" className="text-lg px-8 py-6 rounded-full border-2 hover:bg-accent transition-all">
-              寻找人才
+              Start Hiring
               <Briefcase className="ml-2 h-5 w-5" />
             </Button>
           </Link>

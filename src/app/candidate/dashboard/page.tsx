@@ -1,18 +1,22 @@
 "use client";
 
-import { useState } from "react";
-import { 
-  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer 
-} from 'recharts';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Plus, Pencil, Trash2, Briefcase, Sparkles } from "lucide-react";
+import { Briefcase, DollarSign, MapPin, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
+import { useState } from "react";
+import {
+  PolarAngleAxis,
+  PolarGrid,
+  PolarRadiusAxis,
+  Radar, RadarChart,
+  ResponsiveContainer
+} from 'recharts';
 
 // 模拟雷达图数据
 const skillsData = [
@@ -32,6 +36,15 @@ interface Experience {
 }
 
 export default function MyProfilePage() {
+  // 状态管理：Job Preferences
+  const [preferences, setPreferences] = useState({
+    role: "Full Stack Developer",
+    location: "Remote / NYC",
+    salary: "$140k+"
+  });
+  const [isPrefDialogOpen, setIsPrefDialogOpen] = useState(false);
+  const [tempPref, setTempPref] = useState(preferences);
+
   // 状态管理：工作经历
   const [experiences, setExperiences] = useState<Experience[]>([
     {
@@ -61,18 +74,23 @@ export default function MyProfilePage() {
   const handleSave = () => {
     if (currentExp.id) {
       // 编辑模式
-      setExperiences(experiences.map(exp => 
+      setExperiences(experiences.map(exp =>
         exp.id === currentExp.id ? { ...exp, ...currentExp } as Experience : exp
       ));
     } else {
       // 新增模式
       setExperiences([
-        ...experiences, 
+        ...experiences,
         { ...currentExp, id: Date.now().toString() } as Experience
       ]);
     }
     setIsDialogOpen(false);
     setCurrentExp({});
+  };
+
+  const handleSavePreferences = () => {
+    setPreferences(tempPref);
+    setIsPrefDialogOpen(false);
   };
 
   const openEdit = (exp: Experience) => {
@@ -87,7 +105,7 @@ export default function MyProfilePage() {
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto animate-in fade-in duration-500">
-      
+
       {/* 1. 顶部区域：身份与战力 */}
       <div className="grid md:grid-cols-3 gap-6">
         {/* 左侧：个人信息卡片 */}
@@ -102,9 +120,62 @@ export default function MyProfilePage() {
                 Available
               </Badge>
             </div>
-            <div>
+            <div className="w-full">
               <h2 className="text-2xl font-bold text-slate-900">Alex Chen</h2>
               <p className="text-blue-600 font-medium">Senior Full Stack Developer</p>
+
+              {/* Job Preferences Section */}
+              <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Job Preferences</span>
+                  <Dialog open={isPrefDialogOpen} onOpenChange={setIsPrefDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-blue-600" onClick={() => setTempPref(preferences)}>
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Edit Job Preferences</DialogTitle>
+                        <DialogDescription>Set your career expectations.</DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Target Role</Label>
+                          <Input value={tempPref.role} onChange={(e) => setTempPref({ ...tempPref, role: e.target.value })} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Location</Label>
+                          <Input value={tempPref.location} onChange={(e) => setTempPref({ ...tempPref, location: e.target.value })} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Expected Salary</Label>
+                          <Input value={tempPref.salary} onChange={(e) => setTempPref({ ...tempPref, salary: e.target.value })} />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button onClick={handleSavePreferences}>Save Preferences</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <Badge variant="outline" className="flex items-center gap-1 border-slate-200 text-slate-600">
+                    <Briefcase className="w-3 h-3" />
+                    {preferences.role}
+                  </Badge>
+                  <Badge variant="outline" className="flex items-center gap-1 border-slate-200 text-slate-600">
+                    <MapPin className="w-3 h-3" />
+                    {preferences.location}
+                  </Badge>
+                  <Badge variant="outline" className="flex items-center gap-1 border-slate-200 text-slate-600">
+                    <DollarSign className="w-3 h-3" />
+                    {preferences.salary}
+                  </Badge>
+                </div>
+              </div>
+
             </div>
             <div className="flex flex-wrap gap-2 justify-center pt-2">
               <Badge variant="secondary">React</Badge>
@@ -153,9 +224,9 @@ export default function MyProfilePage() {
         </CardHeader>
         <CardContent>
           <p className="text-slate-700 leading-relaxed text-lg">
-            Alex demonstrates exceptional proficiency in full-stack development with a strong focus on scalable architecture. 
-            The GitHub analysis reveals a high commit velocity and complex system design capabilities. 
-            Particularly strong in React ecosystem and cloud-native solutions. 
+            Alex demonstrates exceptional proficiency in full-stack development with a strong focus on scalable architecture.
+            The GitHub analysis reveals a high commit velocity and complex system design capabilities.
+            Particularly strong in React ecosystem and cloud-native solutions.
             Shows potential for technical leadership roles given the pattern of contributions and code quality.
           </p>
         </CardContent>
