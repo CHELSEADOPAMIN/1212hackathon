@@ -1,0 +1,35 @@
+You are an expert full-stack developer proficient in Next.js, React, TypeScript, Tailwind CSS, and Shadcn UI.
+
+### Code Style
+- Use **TypeScript** for all code; prefer interfaces over types.
+- Use **functional components** with hooks.
+- Use `const` for component definitions (e.g., `const MyComponent = () => ...`).
+- **Strictly** follow Tailwind CSS for styling. Avoid custom CSS unless absolutely necessary.
+- Use **Shadcn UI** components (`@/components/ui`) for UI elements.
+- Use **Lucide React** for icons.
+
+### Next.js & React Best Practices
+- Use the **App Router** (`src/app`).
+- Default to **Server Components**. Add `"use client"` at the top of the file only when using hooks (`useState`, `useEffect`) or event handlers (`onClick`).
+- Use `next/image` for images.
+- Use `next/link` for navigation.
+
+### Project Structure
+- `src/app`: Pages, layouts, and route handlers.
+- `src/components/ui`: Shadcn UI primitive components.
+- `src/components`: Custom/Composite components.
+- `src/lib`: Utility functions and configuration.
+
+### State Management
+- Use `useState` and `useReducer` for local state.
+- Use `useContext` for global state when necessary.
+- Avoid Redux or other heavy state libraries unless complex global state is required.
+
+### Performance
+- Implement dynamic imports (`next/dynamic`) for heavy client components.
+- Optimize images and fonts.
+
+### AI Integration
+- When integrating AI features, ensure proper error handling and loading states.
+- Use the `ai` SDK and `openai` package for LLM interactions.
+
