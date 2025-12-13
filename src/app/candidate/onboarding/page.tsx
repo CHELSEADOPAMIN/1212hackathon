@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowRight, CheckCircle2, FileText, Github, Loader2, UploadCloud, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { DragEvent, useEffect, useRef, useState } from "react";
 import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer } from 'recharts';
 
 // 定义 API 返回的数据类型
@@ -26,25 +26,26 @@ export default function OnboardingPage() {
   const [resumeText, setResumeText] = useState("");
   const [fileName, setFileName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingText, setLoadingText] = useState("正在读取开源代码...");
+  const [loadingText, setLoadingText] = useState("Initializing analysis...");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Loading 状态下的文字轮播效果
   useEffect(() => {
     if (isLoading) {
       const texts = [
-        "正在读取开源代码...",
-        "正在解析项目复杂度...",
-        "正在融合职业经历...",
-        "正在生成战力图谱...",
-        "AI 最终计算中..."
+        "Connecting to GitHub Neural Network...",
+        "Verifying Code Originality...",
+        "Parsing Project Complexity...",
+        "AI Generating Skill Radar...",
+        "Calculating Market Match..."
       ];
       let i = 0;
       const interval = setInterval(() => {
         i = (i + 1) % texts.length;
         setLoadingText(texts[i]);
-      }, 1500);
+      }, 800);
       return () => clearInterval(interval);
     }
   }, [isLoading]);
@@ -56,26 +57,39 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const processFile = async (file: File) => {
     setFileName(file.name);
-
-    // 简单处理：如果是文本文件，尝试读取内容
-    // 对于 PDF/Word，实际生产环境需要后端解析。
-    // 这里为了演示，如果是 PDF/Word，我们填入一个标记，或者提示用户。
-    // Hackathon 技巧：提示用户演示模式下建议使用 txt/md 或直接粘贴。
 
     if (file.type === "text/plain" || file.name.endsWith(".md") || file.name.endsWith(".txt")) {
       const text = await file.text();
       setResumeText(text);
     } else {
-      // 非文本文件，模拟已读取，但在 prompt 中可能需要特殊处理
-      // 这里为了让 AI 正常工作，我们填入一些模拟信息，或者提示用户
-      // 更好的体验是：保留 Textarea，如果解析失败，允许用户手动修改
-      setResumeText(`[已上传文件: ${file.name}]。请忽略此行，根据 GitHub 链接分析。`);
+      setResumeText(`[File Uploaded: ${file.name}]. Content extraction mocked for demo.`);
     }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) await processFile(file);
+  };
+
+  // Drag & Drop Handlers
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) await processFile(file);
   };
 
   const clearFile = () => {
@@ -101,14 +115,16 @@ export default function OnboardingPage() {
 
       if (data.success) {
         setResult(data.data);
+        // Save to LocalStorage for Dashboard
+        localStorage.setItem('userProfile', JSON.stringify(data.data));
         setStep(4);
       } else {
-        alert("分析失败，请重试");
+        alert("Analysis failed, please try again.");
         setStep(1);
       }
     } catch (error) {
       console.error(error);
-      alert("网络错误");
+      alert("Network error");
       setStep(1);
     } finally {
       setIsLoading(false);
@@ -117,16 +133,16 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-slate-50 p-4">
-      {/* 步骤 1: GitHub 输入 */}
+      {/* Step 1: GitHub Input */}
       {step === 1 && (
         <Card className="w-full max-w-md animate-in fade-in zoom-in duration-300">
           <CardHeader>
             <CardTitle className="text-2xl flex items-center gap-2">
               <Github className="w-6 h-6" />
-              第一步：你的代码战力
+              Step 1: Code Power
             </CardTitle>
             <CardDescription>
-              我们需要你的 GitHub 链接来评估你的技术深度。
+              We need your GitHub URL to assess your technical depth.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -142,31 +158,35 @@ export default function OnboardingPage() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={!githubUrl.trim()}>
-                下一步
+                Next
               </Button>
             </form>
           </CardContent>
         </Card>
       )}
 
-      {/* 步骤 2: 简历上传 */}
+      {/* Step 2: Resume Upload */}
       {step === 2 && (
         <Card className="w-full max-w-md animate-in slide-in-from-right-8 duration-300">
           <CardHeader>
             <CardTitle className="text-2xl flex items-center gap-2">
               <FileText className="w-6 h-6" />
-              第二步：上传简历
+              Step 2: Upload Resume
             </CardTitle>
             <CardDescription>
-              支持 PDF, Word, TXT 或 Markdown。AI 将提取关键经历。
+              Supports PDF, Word, TXT, or Markdown. AI will extract key experiences.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* 上传区域 */}
+            {/* Upload Area */}
             {!fileName ? (
               <div
-                className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:bg-slate-50 transition-colors cursor-pointer"
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${isDragging ? "border-blue-500 bg-blue-50" : "border-slate-300 hover:bg-slate-50"
+                  }`}
                 onClick={() => fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
               >
                 <input
                   type="file"
@@ -179,8 +199,8 @@ export default function OnboardingPage() {
                   <div className="p-3 bg-slate-100 rounded-full">
                     <UploadCloud className="w-8 h-8 text-slate-400" />
                   </div>
-                  <p className="font-medium">点击或拖拽文件到此处</p>
-                  <p className="text-xs">支持最大 10MB</p>
+                  <p className="font-medium">Click or Drag file here</p>
+                  <p className="text-xs">Max size 10MB</p>
                 </div>
               </div>
             ) : (
@@ -191,7 +211,7 @@ export default function OnboardingPage() {
                   </div>
                   <div className="text-sm">
                     <p className="font-medium text-slate-700 truncate max-w-[200px]">{fileName}</p>
-                    <p className="text-blue-600 text-xs">已就绪</p>
+                    <p className="text-blue-600 text-xs">Ready</p>
                   </div>
                 </div>
                 <Button variant="ghost" size="icon" onClick={clearFile} className="hover:bg-blue-100 text-slate-400 hover:text-red-500">
@@ -202,12 +222,12 @@ export default function OnboardingPage() {
 
             <div className="relative flex items-center py-2">
               <div className="flex-grow border-t border-slate-200"></div>
-              <span className="flex-shrink-0 mx-4 text-xs text-slate-400">或者手动粘贴</span>
+              <span className="flex-shrink-0 mx-4 text-xs text-slate-400">OR PASTE TEXT</span>
               <div className="flex-grow border-t border-slate-200"></div>
             </div>
 
             <Textarea
-              placeholder="在此粘贴你的个人简介或简历内容..."
+              placeholder="Paste your bio or resume content here..."
               className="min-h-[100px] text-sm"
               value={resumeText}
               onChange={(e) => setResumeText(e.target.value)}
@@ -218,13 +238,13 @@ export default function OnboardingPage() {
               className="w-full"
               disabled={!resumeText.trim()}
             >
-              开始 AI 全局分析
+              Start AI Analysis
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* 步骤 3: Loading */}
+      {/* Step 3: Loading */}
       {step === 3 && (
         <div className="flex flex-col items-center justify-center space-y-8 animate-in fade-in duration-500">
           <div className="relative">
@@ -237,12 +257,12 @@ export default function OnboardingPage() {
             <h3 className="text-xl font-medium text-slate-800 animate-pulse">
               {loadingText}
             </h3>
-            <p className="text-sm text-slate-500">这将需要几秒钟时间</p>
+            <p className="text-sm text-slate-500">This may take a few seconds</p>
           </div>
         </div>
       )}
 
-      {/* 步骤 4: 结果展示 */}
+      {/* Step 4: Result */}
       {step === 4 && result && (
         <Card className="w-full max-w-2xl animate-in zoom-in-95 duration-500 border-2 border-blue-100 shadow-xl">
           <CardHeader className="text-center border-b bg-slate-50/50">
@@ -257,7 +277,7 @@ export default function OnboardingPage() {
 
           <CardContent className="p-8">
             <div className="grid md:grid-cols-2 gap-8 items-center">
-              {/* 雷达图 */}
+              {/* Radar Chart */}
               <div className="h-[300px] w-full relative">
                 <ResponsiveContainer width="100%" height="100%">
                   <RadarChart cx="50%" cy="50%" outerRadius="80%" data={result.skills}>
@@ -276,17 +296,17 @@ export default function OnboardingPage() {
                 </ResponsiveContainer>
               </div>
 
-              {/* 文字描述 */}
+              {/* Text Description */}
               <div className="space-y-6">
                 <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-                  <h4 className="font-semibold text-slate-900 mb-2">AI 评估摘要</h4>
+                  <h4 className="font-semibold text-slate-900 mb-2">AI Summary</h4>
                   <p className="text-slate-600 leading-relaxed">
                     {result.summary}
                   </p>
                 </div>
 
                 <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100">
-                  <h4 className="font-semibold text-emerald-900 mb-2">匹配推荐语</h4>
+                  <h4 className="font-semibold text-emerald-900 mb-2">Match Reason</h4>
                   <p className="text-emerald-700 font-medium italic">
                     "{result.matchReason}"
                   </p>
@@ -297,10 +317,10 @@ export default function OnboardingPage() {
 
           <CardFooter className="p-6 bg-slate-50/50 border-t flex justify-between items-center">
             <Button variant="ghost" onClick={() => setStep(1)}>
-              重新评估
+              Retry
             </Button>
             <Button size="lg" className="bg-blue-600 hover:bg-blue-700" onClick={() => router.push('/candidate/dashboard')}>
-              进入人才池
+              Enter Talent Pool
               <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
           </CardFooter>
