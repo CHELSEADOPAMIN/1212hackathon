@@ -1,0 +1,87 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Briefcase, Radar, Kanban, LogOut, TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CompanyProvider } from "./context";
+
+const sidebarItems = [
+  {
+    title: "My Jobs",
+    href: "/company/jobs",
+    icon: Briefcase,
+  },
+  {
+    title: "Talent Radar",
+    href: "/company/talent-radar",
+    icon: Radar,
+  },
+  {
+    title: "Process Tracker",
+    href: "/company/tracker",
+    icon: Kanban,
+  },
+];
+
+export default function CompanyLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
+
+  return (
+    <CompanyProvider>
+      <div className="flex min-h-screen bg-slate-50">
+        {/* Sidebar */}
+        <aside className="w-64 bg-slate-900 border-r border-slate-800 hidden md:flex flex-col fixed h-full z-10 text-white">
+          <div className="p-6 border-b border-slate-800 flex items-center gap-2">
+            <div className="bg-emerald-500 p-2 rounded-lg">
+              <TrendingUp className="w-6 h-6 text-white" />
+            </div>
+            <span className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
+              Lyrathon Hiring
+            </span>
+          </div>
+
+          <nav className="flex-1 p-4 space-y-2">
+            {sidebarItems.map((item) => {
+              const isActive = pathname === item.href;
+              const Icon = item.icon;
+              return (
+                <Link key={item.href} href={item.href}>
+                  <div
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                      isActive
+                        ? "bg-emerald-600 text-white"
+                        : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                    }`}
+                  >
+                    <Icon className={`w-5 h-5 ${isActive ? "text-white" : "text-slate-400"}`} />
+                    {item.title}
+                  </div>
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="p-4 border-t border-slate-800">
+            <Link href="/">
+              <Button variant="ghost" className="w-full justify-start text-slate-400 hover:text-red-400 hover:bg-red-950/30">
+                <LogOut className="w-5 h-5 mr-3" />
+                Sign Out
+              </Button>
+            </Link>
+          </div>
+        </aside>
+
+        {/* Main Content Area */}
+        <main className="flex-1 md:ml-64 p-8 min-h-screen">
+          {children}
+        </main>
+      </div>
+    </CompanyProvider>
+  );
+}
+
