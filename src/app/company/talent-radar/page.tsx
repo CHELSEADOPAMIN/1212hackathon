@@ -4,49 +4,68 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { BrainCircuit, Heart, Users, X } from "lucide-react";
-import { useState } from "react";
+import { BrainCircuit, Heart, Loader2, Users, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer } from 'recharts';
 import { toast } from "sonner";
 import { Candidate, useCompany } from "../context";
 
-// Mock Candidates
-const MOCK_CANDIDATES: Candidate[] = [
-  {
-    id: "c1",
-    name: "David Kim",
-    role: "Full Stack Architect",
-    avatar: "https://github.com/shadcn.png",
-    skills: [
-      { subject: 'React', A: 98 },
-      { subject: 'Node', A: 95 },
-      { subject: 'AWS', A: 85 },
-      { subject: 'Design', A: 80 },
-      { subject: 'Lead', A: 90 },
-    ],
-    summary: "Ex-Google engineer with 8 years of experience building scalable systems.",
-  },
-  {
-    id: "c2",
-    name: "Emily Wang",
-    role: "AI Research Scientist",
-    avatar: "https://github.com/shadcn.png",
-    skills: [
-      { subject: 'Python', A: 99 },
-      { subject: 'PyTorch', A: 95 },
-      { subject: 'Math', A: 98 },
-      { subject: 'NLP', A: 92 },
-      { subject: 'Lead', A: 70 },
-    ],
-    summary: "PhD in Computer Science. Published 3 papers on LLM optimization.",
-  }
-];
-
 export default function TalentRadarPage() {
   const { addToInterested } = useCompany();
-  const [candidates, setCandidates] = useState(MOCK_CANDIDATES);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0); // 从 0 开始，正序显示
   const [direction, setDirection] = useState<null | 'left' | 'right'>(null);
+
+  useEffect(() => {
+    const fetchCandidates = async () => {
+      try {
+        // Mock current job context - in a real app this would come from the selected job
+        const mockCurrentJob = {
+          title: "Senior Full Stack Engineer",
+          description: "Looking for an experienced developer with React and Node.js skills.",
+          requirements: ["React", "Node.js", "TypeScript", "AWS"],
+          location: "Remote"
+        };
+
+        const response = await fetch('/api/recommendations/candidates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ job: mockCurrentJob }),
+        });
+
+        if (!response.ok) throw new Error('Failed to fetch candidates');
+
+        const data = await response.json();
+
+        if (data.matches && data.matches.length > 0) {
+          const formattedCandidates = data.matches.map((c: any) => ({
+            id: c._id,
+            name: c.name,
+            role: c.role,
+            avatar: c.avatar || "https://github.com/shadcn.png",
+            skills: c.skills.map((s: any) => ({
+              subject: typeof s === 'string' ? s : s.name,
+              A: typeof s === 'object' && s.level ? s.level : Math.floor(Math.random() * 40) + 60 // Fallback level if not present
+            })).slice(0, 5), // Limit to 5 for radar chart
+            summary: c.summary,
+          }));
+          setCandidates(formattedCandidates);
+        } else {
+          setCandidates([]);
+        }
+
+      } catch (error) {
+        console.error("Error fetching candidates:", error);
+        toast.error("Failed to load candidate recommendations");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCandidates();
+  }, []);
+
 
   const currentCandidate = candidates[currentIndex];
 
@@ -79,6 +98,15 @@ export default function TalentRadarPage() {
     cardClass += " translate-x-full opacity-0 rotate-[10deg]";
   } else {
     cardClass += " translate-x-0 opacity-100 rotate-0";
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-80px)] w-full">
+        <Loader2 className="w-10 h-10 animate-spin text-emerald-500" />
+        <p className="mt-4 text-slate-500">Scanning for top talent...</p>
+      </div>
+    );
   }
 
   return (
@@ -137,8 +165,10 @@ export default function TalentRadarPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2 mt-auto">
-                  <Badge variant="secondary" className="text-xs">React Expert</Badge>
-                  <Badge variant="secondary" className="text-xs">Top 1% Github</Badge>
+                  {/* Dynamically render skill badges or other tags */}
+                  {currentCandidate.skills.slice(0, 3).map((skill, i) => (
+                    <Badge key={i} variant="secondary" className="text-xs">{skill.subject}</Badge>
+                  ))}
                 </div>
               </CardContent>
             </Card>

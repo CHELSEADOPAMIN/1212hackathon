@@ -4,50 +4,87 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { DollarSign, Heart, Info, MapPin, X } from "lucide-react";
-import { useState } from "react";
+import { DollarSign, Heart, Info, Loader2, MapPin, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-const JOB_DATA = [
-  {
-    id: 1,
-    company: "OpenAI",
-    role: "AI Researcher",
-    salary: "$200k - $350k",
-    location: "San Francisco, CA",
-    match: 98,
-    tags: ["Python", "PyTorch", "LLM"],
-    description: "Join the team building the future of AGI. You will work on training large language models and improving their reasoning capabilities.",
-    reason: "Your experience with NLP and Transformer models makes you a perfect fit."
-  },
-  {
-    id: 2,
-    company: "Linear",
-    role: "Senior Frontend Engineer",
-    salary: "$180k - $240k",
-    location: "Remote",
-    match: 94,
-    tags: ["React", "TypeScript", "WebGL"],
-    description: "Build the next generation of issue tracking. We obsess over performance and user experience.",
-    reason: "Your portfolio shows exceptional attention to UI detail and React performance optimization."
-  },
-  {
-    id: 3,
-    company: "Stripe",
-    role: "Staff Backend Engineer",
-    salary: "$220k - $300k",
-    location: "New York, NY",
-    match: 91,
-    tags: ["Java", "Distributed Systems", "API Design"],
-    description: "Help us increase the GDP of the internet. You will design and implement high-availability financial infrastructure.",
-    reason: "Your background in microservices matches our infrastructure needs."
-  }
-];
+interface Job {
+  id: string;
+  company: string;
+  role: string;
+  salary: string;
+  location: string;
+  match: number;
+  tags: string[];
+  description: string;
+  reason: string;
+}
 
 export default function OpportunitiesPage() {
-  const [jobs, setJobs] = useState(JOB_DATA);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState<null | 'left' | 'right'>(null);
+
+  useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        const savedProfile = localStorage.getItem('userProfile');
+        if (!savedProfile) {
+          setLoading(false);
+          // Fallback or redirect could go here
+          return;
+        }
+
+        const profile = JSON.parse(savedProfile);
+
+        let response = await fetch('/api/recommendations/jobs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile }),
+        });
+
+        // Fallback to legacy endpoint if needed
+        if (!response.ok) {
+          response = await fetch('/api/matches/jobs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profile }),
+          });
+        }
+
+        if (!response.ok) throw new Error('Failed to fetch jobs');
+
+        const data = await response.json();
+
+        if (data.matches && data.matches.length > 0) {
+          // Transform API data to UI format
+          const formattedJobs = data.matches.map((job: any) => ({
+            id: job._id,
+            company: job.company,
+            role: job.title,
+            salary: job.salary,
+            location: job.location,
+            match: Math.round(job.score * 100),
+            tags: job.requirements ? job.requirements.slice(0, 3) : [],
+            description: job.description,
+            reason: "High similarity based on your skill set and role preference." // Placeholder for AI reason
+          }));
+          setJobs(formattedJobs);
+        } else {
+          setJobs([]);
+        }
+
+      } catch (error) {
+        console.error("Error fetching jobs:", error);
+        toast.error("Failed to load job recommendations");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchJobs();
+  }, []);
 
   const currentJob = jobs[currentIndex];
 
@@ -73,6 +110,15 @@ export default function OpportunitiesPage() {
     cardClass += " translate-x-full opacity-0 rotate-[10deg]";
   } else {
     cardClass += " translate-x-0 opacity-100 rotate-0";
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-80px)] w-full">
+        <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
+        <p className="mt-4 text-slate-500">Finding your perfect matches...</p>
+      </div>
+    );
   }
 
   return (
@@ -154,7 +200,7 @@ export default function OpportunitiesPage() {
           </div>
         ) : (
           <div className="flex items-center justify-center h-full text-slate-500 animate-in fade-in">
-            No more jobs to show!
+            {jobs.length === 0 ? "No matches found yet. Try updating your profile!" : "No more jobs to show!"}
           </div>
         )}
       </div>
