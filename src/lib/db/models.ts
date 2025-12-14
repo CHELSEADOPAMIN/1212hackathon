@@ -47,7 +47,7 @@ export interface ICandidate extends Document {
   summary: string;
   skills: ISkill[];
   experiences?: IExperience[];
-  email?: string;
+  email: string; // Made required for identity
   githubUrl?: string;
   matchReason?: string; // For UI display purposes
   embedding: number[]; // Vector embedding for (role + summary + skills)
@@ -72,7 +72,7 @@ const CandidateSchema: Schema = new Schema({
       description: { type: String },
     }
   ],
-  email: { type: String },
+  email: { type: String, required: true, unique: true }, // Unique index
   githubUrl: { type: String },
   matchReason: { type: String },
   embedding: { type: [Number], required: true, index: false },
@@ -96,7 +96,30 @@ const ApplicationSchema: Schema = new Schema({
   updatedAt: { type: Date, default: Date.now },
 });
 
+// --- Company Model ---
+
+export interface ICompany extends Document {
+  email: string; // Identity
+  name: string;
+  description: string;
+  industry: string;
+  website?: string;
+  location?: string;
+  logoUrl?: string;
+}
+
+const CompanySchema: Schema = new Schema({
+  email: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
+  description: { type: String },
+  industry: { type: String },
+  website: { type: String },
+  location: { type: String },
+  logoUrl: { type: String },
+});
+
 // Avoid OverwriteModelError
 export const Job: Model<IJob> = mongoose.models.Job || mongoose.model<IJob>('Job', JobSchema);
 export const Candidate: Model<ICandidate> = mongoose.models.Candidate || mongoose.model<ICandidate>('Candidate', CandidateSchema);
 export const Application: Model<IApplication> = mongoose.models.Application || mongoose.model<IApplication>('Application', ApplicationSchema);
+export const Company: Model<ICompany> = mongoose.models.Company || mongoose.model<ICompany>('Company', CompanySchema);

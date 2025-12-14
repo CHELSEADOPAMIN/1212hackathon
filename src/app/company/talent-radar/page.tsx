@@ -4,34 +4,72 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DEFAULT_COMPANY_ID } from "@/lib/constants";
 import { BrainCircuit, Heart, Loader2, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer } from 'recharts';
 import { toast } from "sonner";
-import { Candidate, useCompany } from "../context";
+import type { Candidate } from "../context";
+
+interface JobOption {
+  id: string;
+  title: string;
+}
 
 export default function TalentRadarPage() {
-  const { addToInterested } = useCompany();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [currentIndex, setCurrentIndex] = useState(0); // 从 0 开始，正序显示
+  const [loading, setLoading] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState<null | 'left' | 'right'>(null);
 
-  useEffect(() => {
-    const fetchCandidates = async () => {
-      try {
-        // Mock current job context - in a real app this would come from the selected job
-        const mockCurrentJob = {
-          title: "Senior Full Stack Engineer",
-          description: "Looking for an experienced developer with React and Node.js skills.",
-          requirements: ["React", "Node.js", "TypeScript", "AWS"],
-          location: "Remote"
-        };
+  // Job Selection State
+  const [jobs, setJobs] = useState<JobOption[]>([]);
+  const [selectedJobId, setSelectedJobId] = useState<string>("");
+  const [loadingJobs, setLoadingJobs] = useState(true);
 
+  // 1. Load Jobs
+  useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        // In a real app, pass the actual company ID
+        const res = await fetch(`/api/matches/jobs?companyId=${DEFAULT_COMPANY_ID}`);
+        const data = await res.json();
+
+        if (data.success && data.data.length > 0) {
+          const jobOptions = data.data.map((j: any) => ({ id: j._id, title: j.title }));
+          setJobs(jobOptions);
+          // Default select the first job
+          setSelectedJobId(jobOptions[0].id);
+        } else {
+          setJobs([]);
+        }
+      } catch (error) {
+        console.error("Failed to load jobs", error);
+      } finally {
+        setLoadingJobs(false);
+      }
+    };
+    fetchJobs();
+  }, []);
+
+  // 2. Fetch Candidates when Job changes
+  useEffect(() => {
+    if (!selectedJobId) {
+      setCandidates([]);
+      return;
+    }
+
+    const fetchCandidates = async () => {
+      setLoading(true);
+      try {
         const response = await fetch('/api/recommendations/candidates', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ job: mockCurrentJob }),
+          body: JSON.stringify({
+            // We pass just the ID, the backend should fetch the job details
+            jobId: selectedJobId
+          }),
         });
 
         if (!response.ok) throw new Error('Failed to fetch candidates');
@@ -46,11 +84,12 @@ export default function TalentRadarPage() {
             avatar: c.avatar || "https://github.com/shadcn.png",
             skills: c.skills.map((s: any) => ({
               subject: typeof s === 'string' ? s : s.name,
-              A: typeof s === 'object' && s.level ? s.level : Math.floor(Math.random() * 40) + 60 // Fallback level if not present
-            })).slice(0, 5), // Limit to 5 for radar chart
+              A: typeof s === 'object' && s.level ? s.level : Math.floor(Math.random() * 40) + 60
+            })).slice(0, 5),
             summary: c.summary,
           }));
           setCandidates(formattedCandidates);
+          setCurrentIndex(0);
         } else {
           setCandidates([]);
         }
@@ -64,25 +103,51 @@ export default function TalentRadarPage() {
     };
 
     fetchCandidates();
-  }, []);
+  }, [selectedJobId]);
 
 
   const currentCandidate = candidates[currentIndex];
 
   const handleDecision = (dir: 'left' | 'right') => {
+    if (!selectedJobId) return;
+
     setDirection(dir);
 
-    // 动画延迟后切换数据
-    setTimeout(() => {
+    setTimeout(async () => {
       if (dir === 'right' && currentCandidate) {
-        addToInterested(currentCandidate);
-        toast.success("Candidate Saved", {
-          description: `${currentCandidate.name} added to Process Tracker.`,
-        });
+        try {
+          const payload = {
+            actor: "company",
+            action: "like",
+            companyId: DEFAULT_COMPANY_ID,
+            candidateId: currentCandidate.id,
+            jobId: selectedJobId,
+            matchScore: 0.85, // ideally calculated by backend
+          };
+
+          const res = await fetch("/api/match/swipe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          const data = await res.json();
+
+          if (!res.ok || !data.success) {
+            throw new Error(data.error || "Failed to save interest");
+          }
+
+          toast.success("Candidate Saved", {
+            description: `${currentCandidate.name} 已加入 Process Tracker。`,
+          });
+        } catch (error) {
+          console.error("Save match error:", error);
+          toast.error("保存失败，请稍后重试");
+        }
       }
       setCurrentIndex((prev) => prev + 1);
       setDirection(null);
-    }, 300); // 300ms 动画时间
+    }, 300);
   };
 
   const reset = () => {
@@ -100,26 +165,62 @@ export default function TalentRadarPage() {
     cardClass += " translate-x-0 opacity-100 rotate-0";
   }
 
-  if (loading) {
+  if (loadingJobs) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-80px)] w-full">
-        <Loader2 className="w-10 h-10 animate-spin text-emerald-500" />
-        <p className="mt-4 text-slate-500">Scanning for top talent...</p>
+        <Loader2 className="w-10 h-10 animate-spin text-slate-400" />
+        <p className="mt-4 text-slate-500">Loading your jobs...</p>
+      </div>
+    );
+  }
+
+  // No jobs state
+  if (jobs.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-80px)] w-full">
+        <div className="bg-slate-100 p-6 rounded-full mb-4">
+          <BrainCircuit className="w-12 h-12 text-slate-400" />
+        </div>
+        <h2 className="text-xl font-semibold text-slate-900">No Jobs Found</h2>
+        <p className="mt-2 text-slate-500 max-w-sm text-center">
+          You need to post a job before you can find candidates.
+        </p>
+        <Button className="mt-6" onClick={() => window.location.href = '/company/jobs'}>
+          Post a Job
+        </Button>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col items-center h-[calc(100vh-80px)] w-full max-w-md mx-auto relative pt-2">
-      <div className="text-center w-full mb-4 z-0">
+      <div className="text-center w-full mb-4 z-0 flex flex-col items-center">
         <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent">
           Talent Radar
         </h1>
-        <p className="text-slate-500 mt-1">Find your next star employee</p>
+
+        {/* Job Selector */}
+        <div className="mt-2 w-full max-w-xs">
+          <Select value={selectedJobId} onValueChange={setSelectedJobId}>
+            <SelectTrigger className="w-full bg-white/50 backdrop-blur border-slate-200">
+              <SelectValue placeholder="Select a job to match" />
+            </SelectTrigger>
+            <SelectContent>
+              {jobs.map(job => (
+                <SelectItem key={job.id} value={job.id}>{job.title}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="relative w-full h-[550px] z-10">
-        {currentCandidate ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center h-full w-full bg-white/50 rounded-xl border border-dashed border-slate-200">
+            <Loader2 className="w-10 h-10 animate-spin text-emerald-500" />
+            <p className="mt-4 text-slate-500">AI is finding the best matches...</p>
+          </div>
+        ) : currentCandidate ? (
           <div className="w-full h-full p-2">
             <Card className={cardClass}>
               <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 text-white pb-12">
@@ -165,7 +266,6 @@ export default function TalentRadarPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2 mt-auto">
-                  {/* Dynamically render skill badges or other tags */}
                   {currentCandidate.skills.slice(0, 3).map((skill, i) => (
                     <Badge key={i} variant="secondary" className="text-xs">{skill.subject}</Badge>
                   ))}
@@ -176,7 +276,7 @@ export default function TalentRadarPage() {
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-slate-500 space-y-4 animate-in fade-in">
             <Users className="w-12 h-12 opacity-20" />
-            <p>No more candidates.</p>
+            <p>No more candidates found for this role.</p>
             <Button variant="outline" onClick={reset}>Reset List</Button>
           </div>
         )}
@@ -186,7 +286,7 @@ export default function TalentRadarPage() {
         <Button
           size="lg"
           onClick={() => handleDecision('left')}
-          disabled={!currentCandidate || direction !== null}
+          disabled={!currentCandidate || direction !== null || loading}
           className="rounded-full w-16 h-16 bg-white border-2 border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600 shadow-lg"
         >
           <X className="w-8 h-8" />
@@ -194,7 +294,7 @@ export default function TalentRadarPage() {
         <Button
           size="lg"
           onClick={() => handleDecision('right')}
-          disabled={!currentCandidate || direction !== null}
+          disabled={!currentCandidate || direction !== null || loading}
           className="rounded-full w-16 h-16 bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-600 hover:to-teal-700 shadow-lg border-0"
         >
           <Heart className="w-8 h-8 fill-current" />

@@ -5,10 +5,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowRight, CheckCircle2, FileText, Github, Loader2, UploadCloud, X } from "lucide-react";
+import { ArrowRight, CheckCircle2, FileText, Github, Loader2, Mail, UploadCloud, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { DragEvent, useEffect, useRef, useState } from "react";
 import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer } from 'recharts';
+import { toast } from "sonner";
 
 // 定义 API 返回的数据类型
 interface AnalysisResult {
@@ -22,7 +23,14 @@ interface AnalysisResult {
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const [step, setStep] = useState(1);
+  // Step 0: Email, Step 1: GitHub, Step 2: Resume, Step 3: Loading, Step 4: Result
+  const [step, setStep] = useState(0);
+
+  // Auth State
+  const [email, setEmail] = useState("");
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+
+  // Analysis State
   const [githubUrl, setGithubUrl] = useState("");
   const [resumeText, setResumeText] = useState("");
   const [fileName, setFileName] = useState("");
@@ -51,6 +59,42 @@ export default function OnboardingPage() {
       return () => clearInterval(interval);
     }
   }, [isLoading]);
+
+  // --- Step 0: Email Check ---
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+
+    setIsCheckingEmail(true);
+    try {
+      const res = await fetch("/api/auth/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, type: "candidate" }),
+      });
+      const data = await res.json();
+
+      if (data.exists) {
+        // User exists, log them in
+        localStorage.setItem('userProfile', JSON.stringify(data.user));
+        toast.success("Welcome back!", {
+          description: "Logging you in..."
+        });
+        router.push('/candidate/dashboard');
+      } else {
+        // New user, proceed to onboarding
+        toast.info("Welcome!", {
+          description: "Let's build your AI profile."
+        });
+        setStep(1);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error checking email");
+    } finally {
+      setIsCheckingEmail(false);
+    }
+  };
 
   const handleGithubSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,8 +161,8 @@ export default function OnboardingPage() {
 
       if (data.success) {
         setResult(data.data);
-        // Save to LocalStorage for Dashboard
-        localStorage.setItem('userProfile', JSON.stringify(data.data));
+        // Save to LocalStorage for Dashboard (temporary until confirmed)
+        localStorage.setItem('userProfile', JSON.stringify({ ...data.data, email }));
         setStep(4);
       } else {
         alert("Analysis failed, please try again.");
@@ -140,14 +184,14 @@ export default function OnboardingPage() {
       const res = await fetch("/api/candidate/profile/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...result, githubUrl }),
+        body: JSON.stringify({ ...result, githubUrl, email }),
       });
 
       if (res.ok) {
         const savedData = await res.json();
         // Update local storage with the full profile including _id from DB
         if (savedData.success && savedData.data) {
-           localStorage.setItem('userProfile', JSON.stringify(savedData.data));
+          localStorage.setItem('userProfile', JSON.stringify(savedData.data));
         }
         router.push('/candidate/dashboard');
       } else {
@@ -164,9 +208,50 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-slate-50 p-4">
+
+      {/* Step 0: Email Input */}
+      {step === 0 && (
+        <Card className="w-full max-w-md animate-in fade-in zoom-in duration-300">
+          <CardHeader>
+            <CardTitle className="text-2xl flex items-center gap-2">
+              <Mail className="w-6 h-6" />
+              Welcome to Lyrathon
+            </CardTitle>
+            <CardDescription>
+              Enter your email to start the AI assessment or sign in.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleEmailSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={!email.trim() || isCheckingEmail}>
+                {isCheckingEmail ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Checking...
+                  </>
+                ) : (
+                  "Continue"
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Step 1: GitHub Input */}
       {step === 1 && (
-        <Card className="w-full max-w-md animate-in fade-in zoom-in duration-300">
+        <Card className="w-full max-w-md animate-in slide-in-from-right-8 duration-300">
           <CardHeader>
             <CardTitle className="text-2xl flex items-center gap-2">
               <Github className="w-6 h-6" />
@@ -350,9 +435,9 @@ export default function OnboardingPage() {
             <Button variant="ghost" onClick={() => setStep(1)} disabled={isSaving}>
               Retry
             </Button>
-            <Button 
-              size="lg" 
-              className="bg-blue-600 hover:bg-blue-700" 
+            <Button
+              size="lg"
+              className="bg-blue-600 hover:bg-blue-700"
               onClick={handleEnterTalentPool}
               disabled={isSaving}
             >

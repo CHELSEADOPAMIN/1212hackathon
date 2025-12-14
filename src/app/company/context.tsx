@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 
 // 定义数据类型
 export interface Candidate {
@@ -18,7 +18,20 @@ export interface Candidate {
   yourOffer?: number;
 }
 
+// 公司信息类型
+export interface CompanyData {
+  _id?: string;
+  email: string;
+  name: string;
+  industry?: string;
+  description?: string;
+  website?: string;
+  location?: string;
+}
+
 interface CompanyContextType {
+  companyData: CompanyData | null;
+  setCompanyData: (data: CompanyData | null) => void;
   interested: Candidate[];
   interviews: Candidate[];
   offers: Candidate[];
@@ -31,44 +44,27 @@ interface CompanyContextType {
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
 // 初始 Mock 数据
-const INITIAL_INTERVIEWS: Candidate[] = [
-  {
-    id: "demo-interview-1",
-    name: "Sarah Jenkins",
-    role: "Senior Frontend Engineer",
-    avatar: "https://github.com/shadcn.png",
-    skills: [
-      { subject: 'React', A: 95 },
-      { subject: 'Design', A: 88 },
-      { subject: 'Node', A: 70 },
-    ],
-    summary: "Expert in building scalable UI systems. Contributor to major open source libraries.",
-    interviewScore: 92,
-    interviewFeedback: "Candidate showed strong leadership potential and deep understanding of React internals."
-  }
-];
+const INITIAL_INTERVIEWS: Candidate[] = [];
 
-const INITIAL_OFFERS: Candidate[] = [
-  {
-    id: "demo-offer-1",
-    name: "Alex Chen",
-    role: "Full Stack Developer",
-    avatar: "https://github.com/shadcn.png",
-    skills: [
-      { subject: 'System', A: 90 },
-      { subject: 'Coding', A: 95 },
-      { subject: 'Prod', A: 85 },
-    ],
-    summary: "High performance individual with strong system design skills.",
-    marketOffer: 185000,
-    yourOffer: 170000
-  }
-];
+const INITIAL_OFFERS: Candidate[] = [];
 
 export function CompanyProvider({ children }: { children: ReactNode }) {
+  const [companyData, setCompanyData] = useState<CompanyData | null>(null);
   const [interested, setInterested] = useState<Candidate[]>([]);
   const [interviews, setInterviews] = useState<Candidate[]>(INITIAL_INTERVIEWS);
   const [offers, setOffers] = useState<Candidate[]>(INITIAL_OFFERS);
+
+  // 初始化时尝试从 localStorage 加载公司信息
+  useEffect(() => {
+    const saved = localStorage.getItem('companyProfile');
+    if (saved) {
+      try {
+        setCompanyData(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse company profile", e);
+      }
+    }
+  }, []);
 
   const addToInterested = (candidate: Candidate) => {
     setInterested(prev => [...prev, candidate]);
@@ -101,13 +97,15 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   };
 
   const updateOffer = (id: string, newOffer: number) => {
-    setOffers(prev => prev.map(c => 
+    setOffers(prev => prev.map(c =>
       c.id === id ? { ...c, yourOffer: newOffer } : c
     ));
   };
 
   return (
     <CompanyContext.Provider value={{
+      companyData,
+      setCompanyData,
       interested,
       interviews,
       offers,
@@ -128,4 +126,3 @@ export function useCompany() {
   }
   return context;
 }
-
