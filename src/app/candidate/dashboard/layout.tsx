@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { User, Compass, LogOut, Radar } from "lucide-react";
+import { User, Compass, LogOut, Radar, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const sidebarItems = [
@@ -15,6 +15,11 @@ const sidebarItems = [
     title: "Opportunities",
     href: "/candidate/dashboard/opportunities",
     icon: Compass,
+  },
+  {
+    title: "Applications",
+    href: "/candidate/dashboard/applications",
+    icon: ClipboardList,
   },
 ];
 
