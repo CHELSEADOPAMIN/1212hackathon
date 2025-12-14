@@ -6,9 +6,9 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(req: NextRequest) {
   try {
     await dbConnect();
-    const { title, company, description, salary, location, email } = await req.json();
+    const { title, company, companyId, description, salary, location, email } = await req.json();
 
-    if (!title || !company || !description) {
+    if (!title || !company || !companyId || !description) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
     const newJob = await Job.create({
       title,
       company,
+      companyId,
       description,
       salary: salary || "Competitive",
       location: location || "Remote",
@@ -50,4 +51,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

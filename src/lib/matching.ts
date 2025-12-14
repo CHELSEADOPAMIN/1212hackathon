@@ -6,6 +6,7 @@ import {
   Job,
   JobProfileInput,
 } from "@/lib/types";
+import { ObjectId } from "mongodb";
 
 const JOBS_VECTOR_INDEX = process.env.MONGODB_JOBS_INDEX || "vector_index";
 const CANDIDATES_VECTOR_INDEX = process.env.MONGODB_CANDIDATES_INDEX || "vector_index";
@@ -50,7 +51,7 @@ export function buildJobProfileText(job: JobProfileInput) {
     .join(". ");
 }
 
-export async function findJobsForCandidate(profile: CandidateProfileInput) {
+export async function findJobsForCandidate(profile: CandidateProfileInput, excludeIds: string[] = []) {
   const text = buildCandidateProfileText(profile);
   if (!text) {
     throw new Error("Profile data is required to run vector search");
@@ -59,15 +60,28 @@ export async function findJobsForCandidate(profile: CandidateProfileInput) {
   const queryVector = await generateEmbedding(text);
   const collection = await getCollection<Job>("jobs");
 
-  const pipeline = [
+  // Convert string IDs to ObjectIds
+  const excludeObjectIds = excludeIds
+    .filter(id => ObjectId.isValid(id))
+    .map(id => new ObjectId(id));
+
+  const pipeline: any[] = [
     {
       $vectorSearch: {
         index: JOBS_VECTOR_INDEX,
         path: "embedding",
         queryVector,
         numCandidates: NUM_CANDIDATES,
-        limit: LIMIT,
+        limit: LIMIT * 2, // Fetch more to allow for filtering
       },
+    },
+    {
+      $match: {
+        _id: { $nin: excludeObjectIds }
+      }
+    },
+    {
+      $limit: LIMIT
     },
     {
       $project: {
@@ -80,7 +94,7 @@ export async function findJobsForCandidate(profile: CandidateProfileInput) {
   return collection.aggregate<(Job & { score?: number })>(pipeline).toArray();
 }
 
-export async function findCandidatesForJob(jobInput: JobProfileInput) {
+export async function findCandidatesForJob(jobInput: JobProfileInput, excludeIds: string[] = []) {
   const text = buildJobProfileText(jobInput);
   if (!text) {
     throw new Error("Job data is required to run vector search");
@@ -89,15 +103,28 @@ export async function findCandidatesForJob(jobInput: JobProfileInput) {
   const queryVector = await generateEmbedding(text);
   const collection = await getCollection<Candidate>("candidates");
 
-  const pipeline = [
+  // Convert string IDs to ObjectIds
+  const excludeObjectIds = excludeIds
+    .filter(id => ObjectId.isValid(id))
+    .map(id => new ObjectId(id));
+
+  const pipeline: any[] = [
     {
       $vectorSearch: {
         index: CANDIDATES_VECTOR_INDEX,
         path: "embedding",
         queryVector,
         numCandidates: NUM_CANDIDATES,
-        limit: LIMIT,
+        limit: LIMIT * 2, // Fetch more to allow for filtering
       },
+    },
+    {
+      $match: {
+        _id: { $nin: excludeObjectIds }
+      }
+    },
+    {
+      $limit: LIMIT
     },
     {
       $project: {

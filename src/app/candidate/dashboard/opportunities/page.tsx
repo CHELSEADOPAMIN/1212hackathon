@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DollarSign, Heart, Info, Loader2, MapPin, X } from "lucide-react";
+import type { MatchStatus } from "@/lib/types";
+import { DEFAULT_COMPANY_ID } from "@/lib/constants";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -18,13 +20,26 @@ interface Job {
   tags: string[];
   description: string;
   reason: string;
+  matchStatus?: MatchStatus;
+  matchId?: string;
+  companyId?: string;
+  isSpotlight?: boolean;
 }
+
+const toStringId = (value: any) => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  if (value?.toString) return value.toString();
+  return "";
+};
 
 export default function OpportunitiesPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState<null | 'left' | 'right'>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchJobs = async () => {
@@ -38,38 +53,43 @@ export default function OpportunitiesPage() {
 
         const profile = JSON.parse(savedProfile);
 
-        let response = await fetch('/api/recommendations/jobs', {
+        const response = await fetch('/api/candidate/opportunities', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ profile }),
+          body: JSON.stringify({ profile, candidateId: profile._id }),
         });
-
-        // Fallback to legacy endpoint if needed
-        if (!response.ok) {
-          response = await fetch('/api/matches/jobs', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ profile }),
-          });
-        }
 
         if (!response.ok) throw new Error('Failed to fetch jobs');
 
         const data = await response.json();
 
         if (data.matches && data.matches.length > 0) {
-          // Transform API data to UI format
-          const formattedJobs = data.matches.map((job: any) => ({
-            id: job._id,
-            company: job.company,
-            role: job.title,
-            salary: job.salary,
-            location: job.location,
-            match: Math.round(job.score * 100),
-            tags: job.requirements ? job.requirements.slice(0, 3) : [],
-            description: job.description,
-            reason: "High similarity based on your skill set and role preference." // Placeholder for AI reason
-          }));
+          const formattedJobs = data.matches.map((job: any) => {
+            const rawScore = typeof job.score === 'number' ? job.score : (typeof job.matchScore === 'number' ? job.matchScore : undefined);
+            const score = rawScore ?? undefined;
+            const normalizedScore = score ? Math.max(0, Math.min(1, score)) : 0.65;
+            const matchStatus: MatchStatus | undefined = job.matchStatus;
+            const isSpotlight = matchStatus === 'company_interested' || matchStatus === 'matched';
+
+            return {
+              id: toStringId(job._id || job.id),
+              company: job.company || 'Unknown Company',
+              companyId: toStringId(job.companyId || job.company || DEFAULT_COMPANY_ID),
+              role: job.title || 'Open Role',
+              salary: job.salary || 'TBD',
+              location: job.location || 'Remote',
+              match: Math.round(normalizedScore * 100),
+              tags: job.requirements ? job.requirements.slice(0, 3) : [],
+              description: job.description || 'No description available yet.',
+              reason: isSpotlight
+                ? '他们已经对你感兴趣，右滑即可即时配对。'
+                : '基于技能与偏好相似度的智能推荐。',
+              matchStatus,
+              matchId: job.matchId || job._id || job.id,
+              isSpotlight,
+            } as Job;
+          });
+
           setJobs(formattedJobs);
         } else {
           setJobs([]);
@@ -89,65 +109,72 @@ export default function OpportunitiesPage() {
   const currentJob = jobs[currentIndex];
 
   const handleDecision = async (dir: 'left' | 'right') => {
-    // 1. Set direction to trigger animation immediately
     setDirection(dir);
-
-    // 2. Prepare for next card (animation delay)
     const nextCardDelay = 300;
+    const savedProfile = localStorage.getItem('userProfile');
+    const profile = savedProfile ? JSON.parse(savedProfile) : null;
 
-    // If swiped right, we need to save to DB
-    if (dir === 'right' && currentJob) {
+    const candidateId = toStringId(profile?._id || profile?.id);
+    const companyId = toStringId(currentJob?.companyId || currentJob?.company || DEFAULT_COMPANY_ID);
+    const jobId = toStringId(currentJob?.id);
+
+    if (currentJob && candidateId && companyId && jobId) {
       try {
-        const savedProfile = localStorage.getItem('userProfile');
-        if (!savedProfile) {
-          toast.error("Profile not found. Please log in again.");
-          return;
-        }
+        const payload = {
+          actor: 'candidate',
+          action: dir === 'right' ? 'like' : 'reject',
+          companyId,
+          candidateId,
+          jobId,
+          matchScore: currentJob.match ? currentJob.match / 100 : undefined,
+          jobSnapshot: {
+            title: currentJob.role,
+            company: currentJob.company,
+            salary: currentJob.salary,
+            location: currentJob.location,
+            description: currentJob.description,
+            requirements: currentJob.tags,
+          },
+        };
 
-        const profile = JSON.parse(savedProfile);
-        console.log("Saving Application:", { candidateId: profile._id, jobId: currentJob.id });
-
-        if (!profile._id) {
-          toast.error("Invalid profile data. Missing ID.");
-          return;
-        }
-
-        const res = await fetch('/api/application/save', {
+        const res = await fetch('/api/match/swipe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            candidateId: profile._id,
-            jobId: currentJob.id
-          }),
+          body: JSON.stringify(payload),
         });
 
         const data = await res.json();
 
-        if (res.ok && data.success) {
-           // Success!
-           setTimeout(() => {
-            toast.success("Saved to Pending List", {
-              description: "You can view this in the Applications tab.",
-            });
-          }, nextCardDelay);
-        } else {
-          // API returned error
-          console.error("Save failed:", data);
-          toast.error("Failed to save application", {
-            description: data.error || "Unknown error"
-          });
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || `Failed to update match state (${res.status})`);
         }
 
-      } catch (err) {
-        console.error("Network/System error:", err);
-        toast.error("Network error. Could not save application.");
+        const status: MatchStatus | undefined = data.data?.status;
+        const toastMessage = dir === 'right'
+          ? (status === 'matched' ? '双向匹配成功' : '已发送你的兴趣')
+          : '你已跳过该职位';
+
+        const toastDescription = dir === 'right'
+          ? (status === 'matched'
+            ? '已和公司形成匹配，快去查看面试安排。'
+            : '等待公司回应，我们会同步更新状态。')
+          : '该职位将从推荐中移除。';
+
+        toast.success(toastMessage, { description: toastDescription });
+      } catch (error) {
+        console.error('Swipe update failed:', error);
+        toast.error('无法更新匹配状态，请稍后再试。', {
+          description: (error as Error).message,
+        });
       }
-    } else {
-       // Swiped left (pass), just show feedback or nothing
-       // Optional: toast.info("Passed on job");
+    } else if (!candidateId) {
+      toast.error("未找到个人档案，请重新登录后再试。");
+    } else if (!companyId) {
+      toast.error("职位数据缺失公司信息，暂无法操作。");
+    } else if (!jobId) {
+      toast.error("职位缺少 ID，无法完成操作。");
     }
 
-    // 3. Move to next card after animation
     setTimeout(() => {
       setCurrentIndex((prev) => prev + 1);
       setDirection(null);
@@ -176,7 +203,7 @@ export default function OpportunitiesPage() {
   return (
     <div className="flex flex-col items-center h-[calc(100vh-80px)] w-full max-w-md mx-auto relative pt-2">
       <div className="text-center w-full mb-4 z-0">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-pink-500 to-violet-500 bg-clip-text text-transparent">
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-500 to-emerald-500 bg-clip-text text-transparent">
           Discover Jobs
         </h1>
         <p className="text-slate-500 mt-1">Find your next opportunity</p>
@@ -186,8 +213,13 @@ export default function OpportunitiesPage() {
         {currentJob ? (
           <div className="w-full h-full p-2">
             <Card className={cardClass}>
-              <div className="h-28 bg-gradient-to-br from-blue-500 to-indigo-600 p-6 flex items-end">
+              <div className="relative h-28 bg-gradient-to-br from-blue-500 to-emerald-500 p-6 flex items-end">
                 <h2 className="text-2xl font-bold text-white leading-tight">{currentJob.company}</h2>
+                {currentJob.isSpotlight && (
+                  <Badge className="absolute top-4 right-4 bg-white/90 text-emerald-700 border-emerald-200">
+                    {currentJob.matchStatus === 'matched' ? 'Matched' : 'Interested in you'}
+                  </Badge>
+                )}
               </div>
               <CardContent className="p-5 flex flex-col gap-3 h-[calc(100%-112px)] justify-between">
                 <div>
@@ -217,16 +249,20 @@ export default function OpportunitiesPage() {
                     ))}
                   </div>
 
-                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                    <p className="text-xs text-blue-800 italic leading-relaxed">
+                  <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
+                    <p className="text-xs text-emerald-800 italic leading-relaxed">
                       "AI: {currentJob.reason}"
                     </p>
                   </div>
                 </div>
 
-                <Dialog>
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="outline" className="w-full mt-auto h-9 text-sm">
+                    <Button
+                      variant="outline"
+                      className="w-full mt-auto h-9 text-sm"
+                      onClick={() => setIsDialogOpen(true)}
+                    >
                       <Info className="w-4 h-4 mr-2" />
                       View Details
                     </Button>
@@ -243,7 +279,16 @@ export default function OpportunitiesPage() {
                       <p className="text-slate-600 leading-relaxed">{currentJob.reason}</p>
                     </div>
                     <div className="flex justify-end gap-2">
-                      <Button variant="default">Apply Now</Button>
+                      <Button
+                        variant="default"
+                        disabled={!currentJob || direction !== null}
+                        onClick={() => {
+                          setIsDialogOpen(false);
+                          handleDecision('right');
+                        }}
+                      >
+                        Apply Now
+                      </Button>
                     </div>
                   </DialogContent>
                 </Dialog>
@@ -270,7 +315,7 @@ export default function OpportunitiesPage() {
           size="lg"
           onClick={() => handleDecision('right')}
           disabled={!currentJob || direction !== null}
-          className="rounded-full w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-lg border-0"
+          className="rounded-full w-16 h-16 bg-gradient-to-r from-blue-500 to-emerald-600 text-white hover:from-blue-600 hover:to-emerald-700 shadow-lg border-0"
         >
           <Heart className="w-8 h-8 fill-current" />
         </Button>

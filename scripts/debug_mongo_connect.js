@@ -1,29 +1,45 @@
-const { MongoClient } = require('mongodb');
+const mongoose = require('mongoose');
+const fs = require('fs');
+const path = require('path');
 
-// 从 .env.local 读取或直接硬编码测试 (为了安全，我先读取环境变量，但这里我们直接用刚才看到的URI进行测试，确保无误)
-const uri = "mongodb+srv://yangqiqi789_db_user:QixinYang1228@cluster0.rz4e1mv.mongodb.net/?appName=Cluster0";
+// Try to read .env.local manually since we can't rely on dotenv in this environment
+let uri = process.env.MONGODB_URI;
 
-async function run() {
-  console.log("Attempting to connect to MongoDB...");
-  const client = new MongoClient(uri, {
-    // 尝试添加一些 SSL 相关选项来调试
-    tls: true,
-    tlsAllowInvalidCertificates: true, // 尝试忽略证书错误
-    serverSelectionTimeoutMS: 5000,
-    connectTimeoutMS: 10000,
-  });
-
+if (!uri) {
   try {
-    await client.connect();
-    console.log("✅ Connected successfully to server");
-    const db = client.db("test_connection");
-    const result = await db.command({ ping: 1 });
-    console.log("✅ Ping result:", result);
-  } catch (dir) {
-    console.error("❌ Connection failed:", dir);
-  } finally {
-    await client.close();
+    const envPath = path.resolve(process.cwd(), '.env.local');
+    if (fs.existsSync(envPath)) {
+      const envConfig = fs.readFileSync(envPath, 'utf8');
+      const match = envConfig.match(/MONGODB_URI=(.+)/);
+      if (match) {
+        uri = match[1].trim().replace(/^["']|["']$/g, '');
+      }
+    }
+  } catch (e) {
+    console.error("Failed to read .env.local", e);
   }
 }
 
-run();
+if (!uri) {
+  console.error("❌ MONGODB_URI not found in environment or .env.local");
+  process.exit(1);
+}
+
+console.log("Attempting to connect to MongoDB...");
+
+mongoose.connect(uri)
+  .then(() => {
+    console.log("✅ Successfully connected to MongoDB!");
+
+    // Check Candidates collection count
+    return mongoose.connection.db.collection('candidates').countDocuments();
+  })
+  .then((count) => {
+    console.log(`📊 Current Candidate Count: ${count}`);
+    process.exit(0);
+  })
+  .catch((err) => {
+    console.error("❌ Connection failed:", err.message);
+    if (err.cause) console.error("Cause:", err.cause);
+    process.exit(1);
+  });

@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DEFAULT_COMPANY_ID } from "@/lib/constants";
 import type { MatchStatus } from "@/lib/types";
 import {
   AlertCircle, BrainCircuit,
@@ -27,6 +26,7 @@ import { Candidate, useCompany } from "../context";
 
 export default function ProcessTrackerPage() {
   const {
+    companyData,
     interviews, offers,
     moveToOffer, updateOffer
   } = useCompany();
@@ -56,7 +56,15 @@ export default function ProcessTrackerPage() {
   const loadPipeline = async () => {
     try {
       setLoadingPipeline(true);
-      const res = await fetch(`/api/company/pipeline?companyId=${DEFAULT_COMPANY_ID}`);
+      const companyId = companyData?._id;
+      if (!companyId) {
+        setPipeline([]);
+        toast.error("请先登录公司账户");
+        setLoadingPipeline(false);
+        return;
+      }
+
+      const res = await fetch(`/api/company/pipeline?companyId=${companyId}`);
       const data = await res.json();
 
       if (!res.ok || !data.success) {
@@ -95,7 +103,7 @@ export default function ProcessTrackerPage() {
 
   useEffect(() => {
     loadPipeline();
-  }, []);
+  }, [companyData?._id]);
 
   useEffect(() => {
     return () => {
@@ -243,7 +251,10 @@ export default function ProcessTrackerPage() {
                       : { text: "Sent by Company", className: "bg-slate-100 text-slate-600" };
 
                 return (
-                  <Card key={item.id} className="hover:shadow-md transition-shadow relative group/card">
+                  <Card
+                    key={item.id}
+                    className="hover:shadow-md transition-shadow relative group/card h-full overflow-hidden"
+                  >
                     <Button
                       size="icon"
                       variant="ghost"
@@ -252,7 +263,7 @@ export default function ProcessTrackerPage() {
                     >
                       <X className="w-4 h-4" />
                     </Button>
-                    <CardHeader className="flex flex-row items-center gap-4">
+                    <CardHeader className="flex flex-row items-start gap-4 min-w-0">
                       <Avatar>
                         <AvatarImage src={item.candidate.avatar} />
                         <AvatarFallback>{item.candidate.name[0]}</AvatarFallback>
@@ -260,20 +271,26 @@ export default function ProcessTrackerPage() {
                       <div className="flex-1">
                         <div className="flex items-center justify-between gap-2">
                           <div>
-                            <CardTitle className="text-lg">{item.candidate.name}</CardTitle>
-                            <CardDescription>{item.candidate.role}</CardDescription>
+                            <CardTitle className="text-lg leading-tight break-words">{item.candidate.name}</CardTitle>
+                            <CardDescription className="break-words">{item.candidate.role}</CardDescription>
                           </div>
                           <Badge className={statusLabel.className}>{statusLabel.text}</Badge>
                         </div>
-                        <p className="text-xs text-slate-500 mt-1">
+                        <p className="text-xs text-slate-500 mt-1 break-words">
                           {item.jobTitle} · {item.jobLocation}
                         </p>
                       </div>
                     </CardHeader>
-                    <CardContent className="space-y-3">
+                    <CardContent className="space-y-3 min-w-0">
                       <div className="flex flex-wrap gap-2">
                         {item.candidate.skills.slice(0, 3).map((s) => (
-                          <Badge key={s.subject} variant="secondary">{s.subject}</Badge>
+                          <Badge
+                            key={s.subject}
+                            variant="secondary"
+                            className="max-w-full whitespace-normal break-words leading-snug"
+                          >
+                            {s.subject}
+                          </Badge>
                         ))}
                       </div>
                       {typeof item.matchScore === "number" && (

@@ -5,6 +5,8 @@ import mongoose, { Document, Model, Schema } from 'mongoose';
 export interface IJob extends Document {
   title: string;
   company: string;
+  companyId?: mongoose.Types.ObjectId;
+  companyEmail?: string;
   location: string;
   type: string; // 'Full-time', 'Contract', etc.
   salary: string;
@@ -17,6 +19,8 @@ export interface IJob extends Document {
 const JobSchema: Schema = new Schema({
   title: { type: String, required: true },
   company: { type: String, required: true },
+  companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true },
+  companyEmail: { type: String },
   location: { type: String, required: true },
   type: { type: String, required: true },
   salary: { type: String, required: true },

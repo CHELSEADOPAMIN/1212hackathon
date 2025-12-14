@@ -1,15 +1,51 @@
+import { DEFAULT_COMPANY_ID } from "@/lib/constants";
+import { Job } from "@/lib/db/models";
+import dbConnect from "@/lib/db/mongodb";
+import { getMatchesCollection } from "@/lib/matches";
 import { findCandidatesForJob } from "@/lib/matching";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
-    const { job } = await req.json();
+    await dbConnect();
+    const body = await req.json();
+    let job = body.job;
+    const { jobId } = body;
 
-    if (!job) {
-      return NextResponse.json({ error: "Job data is required" }, { status: 400 });
+    // 如果没有传完整的 job 对象，但传了 jobId，尝试从数据库查询
+    if (!job && jobId) {
+      job = await Job.findById(jobId);
     }
 
-    const candidates = await findCandidatesForJob(job);
+    if (!job) {
+      return NextResponse.json({ error: "Job data or valid Job ID is required" }, { status: 400 });
+    }
+
+    // 1. 获取已互动的候选人 ID 列表
+    const matchesCollection = await getMatchesCollection();
+
+    // 使用传入的 jobId 和 假设的 companyId (或者从 Job 中获取)
+    // 注意：这里我们假设 companyId 是 DEFAULT_COMPANY_ID，或者从请求中传过来。
+    // 在真实场景中，应该从 Session 或 Token 获取 Company ID。
+    const companyId =
+      body.companyId ||
+      job?.companyId?.toString?.() ||
+      DEFAULT_COMPANY_ID; // 或者 job.companyId (如果 schema 有)
+
+    // 查找该职位所有已滑过的记录 (无论 like 还是 reject)
+    const existingMatches = await matchesCollection
+      .find({
+        jobId: jobId?.toString() || job?._id?.toString?.(),
+        companyId: companyId // 确保只过滤当前公司的互动
+      })
+      .project({ candidateId: 1 })
+      .toArray();
+
+    const excludeIds = existingMatches.map(m => m.candidateId.toString());
+
+    // 2. 查找推荐候选人，并排除已互动的
+    const candidates = await findCandidatesForJob(job, excludeIds);
+
     return NextResponse.json({ matches: candidates });
   } catch (error: any) {
     console.error("Candidate recommendation error:", error);

@@ -6,11 +6,17 @@ export async function GET(req: NextRequest) {
   try {
     await dbConnect();
 
-    // In a real app, filtering by companyId would be done here
-    // const { searchParams } = new URL(req.url);
-    // const companyId = searchParams.get('companyId');
+    const { searchParams } = new URL(req.url);
+    const companyId = searchParams.get('companyId');
 
-    const jobs = await Job.find({}).sort({ postedAt: -1 });
+    if (!companyId) {
+      return NextResponse.json(
+        { error: "companyId is required" },
+        { status: 400 }
+      );
+    }
+
+    const jobs = await Job.find({ companyId }).sort({ postedAt: -1 });
 
     return NextResponse.json({ success: true, data: jobs });
   } catch (error: any) {
@@ -21,4 +27,3 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-
