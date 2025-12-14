@@ -5,6 +5,8 @@ import mongoose, { Document, Model, Schema } from 'mongoose';
 export interface IJob extends Document {
   title: string;
   company: string;
+  companyId?: mongoose.Types.ObjectId;
+  companyEmail?: string;
   location: string;
   type: string; // 'Full-time', 'Contract', etc.
   salary: string;
@@ -17,6 +19,8 @@ export interface IJob extends Document {
 const JobSchema: Schema = new Schema({
   title: { type: String, required: true },
   company: { type: String, required: true },
+  companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true },
+  companyEmail: { type: String },
   location: { type: String, required: true },
   type: { type: String, required: true },
   salary: { type: String, required: true },
@@ -78,24 +82,6 @@ const CandidateSchema: Schema = new Schema({
   embedding: { type: [Number], required: true, index: false },
 });
 
-// --- Application Model ---
-
-export interface IApplication extends Document {
-  candidateId: mongoose.Types.ObjectId;
-  jobId: mongoose.Types.ObjectId;
-  status: 'pending' | 'interview' | 'offer' | 'rejected';
-  appliedAt: Date;
-  updatedAt: Date;
-}
-
-const ApplicationSchema: Schema = new Schema({
-  candidateId: { type: Schema.Types.ObjectId, ref: 'Candidate', required: true },
-  jobId: { type: Schema.Types.ObjectId, ref: 'Job', required: true },
-  status: { type: String, enum: ['pending', 'interview', 'offer', 'rejected'], default: 'pending' },
-  appliedAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
-});
-
 // --- Company Model ---
 
 export interface ICompany extends Document {
@@ -121,5 +107,4 @@ const CompanySchema: Schema = new Schema({
 // Avoid OverwriteModelError
 export const Job: Model<IJob> = mongoose.models.Job || mongoose.model<IJob>('Job', JobSchema);
 export const Candidate: Model<ICandidate> = mongoose.models.Candidate || mongoose.model<ICandidate>('Candidate', CandidateSchema);
-export const Application: Model<IApplication> = mongoose.models.Application || mongoose.model<IApplication>('Application', ApplicationSchema);
 export const Company: Model<ICompany> = mongoose.models.Company || mongoose.model<ICompany>('Company', CompanySchema);

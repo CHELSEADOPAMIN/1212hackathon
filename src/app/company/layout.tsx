@@ -64,8 +64,8 @@ export default function CompanyLayout({
                 <Link key={item.href} href={item.href}>
                   <div
                     className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${isActive
-                        ? "bg-emerald-600 text-white"
-                        : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                      ? "bg-emerald-600 text-white"
+                      : "text-slate-400 hover:bg-slate-800 hover:text-white"
                       }`}
                   >
                     <Icon className={`w-5 h-5 ${isActive ? "text-white" : "text-slate-400"}`} />

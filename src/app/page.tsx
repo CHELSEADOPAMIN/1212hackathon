@@ -55,7 +55,7 @@ export default function LandingPage() {
             Hire like trading stocks. See real skill scores and bid for top talent transparently.
           </p>
 
-          <Link href="/company/jobs">
+          <Link href="/company/onboarding">
             <Button variant="outline" size="lg" className="text-lg px-8 py-6 rounded-full border-2 hover:bg-accent transition-all">
               Start Hiring
               <Briefcase className="ml-2 h-5 w-5" />

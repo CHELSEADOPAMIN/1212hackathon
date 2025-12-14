@@ -17,12 +17,16 @@ import {
   Users
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useCompany } from "../context";
+
 
 interface Job {
   id: string;
   title: string;
+  description?: string;
+  salary?: string;
   applicants: number;
   matches: number;
   views: number;
@@ -30,15 +34,50 @@ interface Job {
   postedAt: string;
 }
 
-const INITIAL_JOBS: Job[] = [];
-
-import { useCompany } from "../context";
-
 export default function JobsPage() {
   const router = useRouter();
   const { companyData } = useCompany();
-  const [jobs, setJobs] = useState<Job[]>(INITIAL_JOBS);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Load jobs from DB
+  useEffect(() => {
+    const companyId = companyData?._id;
+    if (!companyId) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const fetchJobs = async () => {
+      try {
+        const res = await fetch(`/api/company/jobs?companyId=${companyId}`); // Use current company
+        const data = await res.json();
+
+        if (data.success && Array.isArray(data.data)) {
+          const formattedJobs = data.data.map((j: any) => ({
+            id: j._id,
+            title: j.title,
+            description: j.description,
+            salary: j.salary,
+            applicants: 0,
+            matches: 0,
+            views: 0,
+            status: 'active',
+            postedAt: new Date(j.postedAt).toLocaleDateString()
+          }));
+          setJobs(formattedJobs);
+        }
+      } catch (error) {
+        console.error("Failed to load jobs", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchJobs();
+  }, [companyData?._id]);
 
   // New Job Form State
   const [formData, setFormData] = useState({
@@ -58,24 +97,84 @@ export default function JobsPage() {
     });
   };
 
-  const handlePostJob = () => {
-    const newJob: Job = {
-      id: Date.now().toString(),
-      title: formData.title || "Untitled Position",
-      applicants: 0,
-      matches: 0,
-      views: 0,
-      status: "active",
-      postedAt: "Just now"
-    };
+  const handleSaveJob = async () => {
+    if (!companyData?._id) {
+      toast.error("Please log in to your company account before posting a job");
+      return;
+    }
 
-    setJobs([newJob, ...jobs]);
-    setIsDialogOpen(false);
-    setFormData({ title: "", salary: "", description: "" });
+    try {
+      const payload = {
+        ...formData,
+        company: companyData?.name || "Company",
+        email: companyData?.email || "unknown",
+        companyId: companyData._id,
+      };
 
-    toast.success("Job Posted Successfully", {
-      description: "You can now start matching with candidates."
+      let url = "/api/company/job/save";
+      let method = "POST";
+
+      if (editingId) {
+        url = "/api/company/job/update";
+        method = "PUT";
+        (payload as any).id = editingId;
+      }
+
+      const res = await fetch(url, {
+        method: method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.data) {
+        const savedJob = data.data;
+        const formattedJob: Job = {
+          id: savedJob._id,
+          title: savedJob.title,
+          description: savedJob.description,
+          salary: savedJob.salary,
+          applicants: 0,
+          matches: 0,
+          views: 0,
+          status: "active",
+          postedAt: "Just now" // Simplified
+        };
+
+        if (editingId) {
+          setJobs(jobs.map(j => j.id === editingId ? {
+            ...j,
+            title: savedJob.title,
+            salary: savedJob.salary,
+            description: savedJob.description
+          } : j));
+          toast.success("Job Updated Successfully");
+        } else {
+          setJobs([formattedJob, ...jobs]);
+          toast.success("Job Posted Successfully");
+        }
+
+        setIsDialogOpen(false);
+        setFormData({ title: "", salary: "", description: "" });
+        setEditingId(null);
+      } else {
+        toast.error("Failed to save job");
+      }
+    } catch (error) {
+      console.error("Save job error:", error);
+      toast.error("Network error");
+    }
+  };
+
+  const handleEdit = (job: Job) => {
+    setEditingId(job.id);
+    setFormData({
+      title: job.title,
+      salary: job.salary || "",
+      description: job.description || ""
     });
+    setIsDialogOpen(true);
   };
 
   const toggleStatus = (id: string) => {
@@ -109,9 +208,9 @@ export default function JobsPage() {
           </DialogTrigger>
           <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
-              <DialogTitle>Post a New Job</DialogTitle>
+              <DialogTitle>{editingId ? "Edit Job" : "Post a New Job"}</DialogTitle>
               <DialogDescription>
-                Create a new position. Use AI to auto-fill the description.
+                {editingId ? "Update job details." : "Create a new position. Use AI to auto-fill the description."}
               </DialogDescription>
             </DialogHeader>
 
@@ -161,8 +260,8 @@ export default function JobsPage() {
             </div>
 
             <DialogFooter>
-              <Button type="submit" onClick={handlePostJob} className="bg-emerald-600 hover:bg-emerald-700 w-full">
-                Post Job
+              <Button type="submit" onClick={handleSaveJob} className="bg-emerald-600 hover:bg-emerald-700 w-full">
+                {editingId ? "Update Job" : "Post Job"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -219,7 +318,7 @@ export default function JobsPage() {
               </div>
 
               <div className="flex gap-2">
-                <Button variant="ghost" size="sm">Edit</Button>
+                <Button variant="ghost" size="sm" onClick={() => handleEdit(job)}>Edit</Button>
                 <Button
                   size="sm"
                   className="bg-slate-900 hover:bg-slate-800 text-white"
@@ -236,4 +335,3 @@ export default function JobsPage() {
     </div>
   );
 }
-

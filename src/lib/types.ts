@@ -33,6 +33,8 @@ export interface Job {
   _id?: ObjectId;
   title: string;
   company: string;
+  companyId?: string;
+  companyEmail?: string;
   location: string;
   type: string;
   salary: string;
@@ -40,6 +42,16 @@ export interface Job {
   requirements: string[];
   postedAt?: Date;
   embedding: EmbeddingVector;
+}
+
+export interface Company {
+  _id?: ObjectId | string;
+  name: string;
+  description?: string;
+  industry?: string;
+  website?: string;
+  location?: string;
+  logoUrl?: string;
 }
 
 export interface CandidateProfileInput {
@@ -58,4 +70,44 @@ export interface JobProfileInput {
   company?: string;
   location?: string;
   type?: string;
+}
+
+export type MatchStatus =
+  | "company_interested"
+  | "candidate_interested"
+  | "matched"
+  | "interview_pending"
+  | "rejected"
+  | "rejected_by_candidate";
+
+export interface MatchJobSnapshot {
+  title?: string;
+  company?: string;
+  salary?: string;
+  location?: string;
+  description?: string;
+  requirements?: string[];
+}
+
+export interface MatchCandidateSnapshot {
+  name?: string;
+  role?: string;
+  summary?: string;
+  avatar?: string;
+  skills?: Array<{ name?: string; subject?: string; level?: number; category?: string }>;
+}
+
+export interface Match {
+  _id?: ObjectId;
+  companyId: string;
+  candidateId: string;
+  jobId: string;
+  status: MatchStatus;
+  initiator: "company" | "candidate";
+  matchScore?: number;
+  createdAt: Date;
+  updatedAt: Date;
+  isSoftDeleted?: boolean;
+  jobSnapshot?: MatchJobSnapshot;
+  candidateSnapshot?: MatchCandidateSnapshot;
 }

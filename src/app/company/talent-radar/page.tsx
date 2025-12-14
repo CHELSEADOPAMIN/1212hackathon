@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer } from 'recharts';
 import { toast } from "sonner";
 import type { Candidate } from "../context";
+import { useCompany } from "../context";
 
 interface JobOption {
   id: string;
@@ -18,6 +19,7 @@ interface JobOption {
 }
 
 export default function TalentRadarPage() {
+  const { companyData } = useCompany();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -30,10 +32,17 @@ export default function TalentRadarPage() {
 
   // 1. Load Jobs
   useEffect(() => {
+    const companyId = companyData?._id;
+    if (!companyId) {
+      setJobs([]);
+      setLoadingJobs(false);
+      return;
+    }
+
+    setLoadingJobs(true);
     const fetchJobs = async () => {
       try {
-        // In a real app, pass the actual company ID
-        const res = await fetch(`/api/matches/jobs?companyId=${DEFAULT_COMPANY_ID}`);
+        const res = await fetch(`/api/company/jobs?companyId=${companyId}`);
         const data = await res.json();
 
         if (data.success && data.data.length > 0) {
@@ -51,7 +60,7 @@ export default function TalentRadarPage() {
       }
     };
     fetchJobs();
-  }, []);
+  }, [companyData?._id]);
 
   // 2. Fetch Candidates when Job changes
   useEffect(() => {
@@ -68,7 +77,8 @@ export default function TalentRadarPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             // We pass just the ID, the backend should fetch the job details
-            jobId: selectedJobId
+            jobId: selectedJobId,
+            companyId: companyData?._id || DEFAULT_COMPANY_ID
           }),
         });
 
@@ -84,7 +94,7 @@ export default function TalentRadarPage() {
             avatar: c.avatar || "https://github.com/shadcn.png",
             skills: c.skills.map((s: any) => ({
               subject: typeof s === 'string' ? s : s.name,
-              A: typeof s === 'object' && s.level ? s.level : Math.floor(Math.random() * 40) + 60
+              A: typeof s === 'object' && s.level ? s.level : 0
             })).slice(0, 5),
             summary: c.summary,
           }));
@@ -109,7 +119,12 @@ export default function TalentRadarPage() {
   const currentCandidate = candidates[currentIndex];
 
   const handleDecision = (dir: 'left' | 'right') => {
+    const companyId = companyData?._id || DEFAULT_COMPANY_ID;
     if (!selectedJobId) return;
+    if (!companyId) {
+      toast.error("Please log in to your company account before proceeding");
+      return;
+    }
 
     setDirection(dir);
 
@@ -119,7 +134,7 @@ export default function TalentRadarPage() {
           const payload = {
             actor: "company",
             action: "like",
-            companyId: DEFAULT_COMPANY_ID,
+            companyId,
             candidateId: currentCandidate.id,
             jobId: selectedJobId,
             matchScore: 0.85, // ideally calculated by backend
@@ -138,11 +153,11 @@ export default function TalentRadarPage() {
           }
 
           toast.success("Candidate Saved", {
-            description: `${currentCandidate.name} 已加入 Process Tracker。`,
+            description: `${currentCandidate.name} has been added to Process Tracker.`,
           });
         } catch (error) {
           console.error("Save match error:", error);
-          toast.error("保存失败，请稍后重试");
+          toast.error("Save failed, please try again later");
         }
       }
       setCurrentIndex((prev) => prev + 1);
@@ -156,7 +171,7 @@ export default function TalentRadarPage() {
   };
 
   // 动画 Class 计算
-  let cardClass = "h-full shadow-xl border-2 border-slate-100 bg-white overflow-hidden transition-all duration-300 ease-in-out transform";
+  let cardClass = "h-full min-w-0 shadow-xl border-2 border-slate-100 bg-white overflow-hidden transition-all duration-300 ease-in-out transform";
   if (direction === 'left') {
     cardClass += " -translate-x-full opacity-0 rotate-[-10deg]";
   } else if (direction === 'right') {
@@ -194,7 +209,7 @@ export default function TalentRadarPage() {
 
   return (
     <div className="flex flex-col items-center h-[calc(100vh-80px)] w-full max-w-md mx-auto relative pt-2">
-      <div className="text-center w-full mb-4 z-0 flex flex-col items-center">
+      <div className="text-center w-full mb-4 z-50 flex flex-col items-center">
         <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent">
           Talent Radar
         </h1>
@@ -203,7 +218,9 @@ export default function TalentRadarPage() {
         <div className="mt-2 w-full max-w-xs">
           <Select value={selectedJobId} onValueChange={setSelectedJobId}>
             <SelectTrigger className="w-full bg-white/50 backdrop-blur border-slate-200">
-              <SelectValue placeholder="Select a job to match" />
+              <SelectValue placeholder="Select a job to match">
+                {jobs.find(j => j.id === selectedJobId)?.title || "Select a job to match"}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {jobs.map(job => (
@@ -236,7 +253,7 @@ export default function TalentRadarPage() {
                 </div>
               </div>
 
-              <CardContent className="px-6 -mt-8 flex flex-col gap-3 h-[calc(100%-120px)]">
+              <CardContent className="px-6 -mt-8 flex flex-col gap-3 h-[calc(100%-120px)] min-h-0 overflow-hidden">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-2 h-[220px] shrink-0">
                   <ResponsiveContainer width="100%" height="100%">
                     <RadarChart cx="50%" cy="50%" outerRadius="70%" data={currentCandidate.skills}>
@@ -260,14 +277,20 @@ export default function TalentRadarPage() {
                     <BrainCircuit className="w-4 h-4 text-emerald-600" />
                     AI Insight
                   </div>
-                  <p className="text-slate-600 text-xs leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100 line-clamp-3">
+                  <div className="text-slate-600 text-xs leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100 max-h-28 overflow-y-auto pr-2 whitespace-pre-line">
                     {currentCandidate.summary}
-                  </p>
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 mt-auto">
+                <div className="flex flex-wrap gap-2 mt-auto max-h-20 overflow-y-auto pr-1">
                   {currentCandidate.skills.slice(0, 3).map((skill, i) => (
-                    <Badge key={i} variant="secondary" className="text-xs">{skill.subject}</Badge>
+                    <Badge
+                      key={i}
+                      variant="secondary"
+                      className="text-xs max-w-full whitespace-normal break-words leading-snug"
+                    >
+                      {skill.subject}
+                    </Badge>
                   ))}
                 </div>
               </CardContent>

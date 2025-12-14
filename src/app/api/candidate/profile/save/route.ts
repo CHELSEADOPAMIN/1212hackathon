@@ -1,79 +1,109 @@
-import { generateEmbedding } from "@/lib/ai/embedding";
 import { Candidate } from "@/lib/db/models";
-import connectToDatabase from "@/lib/db/mongodb";
-import { buildCandidateProfileText } from "@/lib/matching";
-import { NextResponse } from "next/server";
+import dbConnect from "@/lib/db/mongodb";
+import { NextRequest, NextResponse } from "next/server";
+import { OpenAI } from "openai";
 
-export async function POST(req: Request) {
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+async function getEmbedding(text: string) {
   try {
-    // 1. Connect to DB
-    await connectToDatabase();
-
-    // 2. Parse Body
-    const body = await req.json();
-    const { name, role, summary, skills, experiences, matchReason, githubUrl } = body;
-
-    // 3. Validate
-    if (!name || !role || !summary || !skills) {
-      return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 });
-    }
-
-    // 4. Map skills format
-    // Frontend: { subject: string; A: number }[]
-    // DB: { name: string; level: number; category?: string }[]
-    const formattedSkills = skills.map((s: any) => ({
-      name: s.subject || s.name,
-      level: s.A || s.level,
-      category: "General"
-    }));
-
-    // 5. Generate text for embedding
-    const textToEmbed = buildCandidateProfileText({
-      name,
-      role,
-      summary,
-      skills: formattedSkills,
-      experiences: experiences // Pass experiences to builder
+    const response = await openai.embeddings.create({
+      model: "text-embedding-3-small",
+      input: text,
+      encoding_format: "float",
     });
-    
-    // 6. Generate embedding
-    const embedding = await generateEmbedding(textToEmbed);
+    return response.data[0].embedding;
+  } catch (error) {
+    console.error("Error generating embedding:", error);
+    // Return a zero vector or throw depending on requirements
+    // For now, throwing to ensure we don't save invalid data
+    throw error;
+  }
+}
 
-    // 7. Upsert Candidate
-    // Using findOneAndUpdate to upsert if githubUrl is present
-    let candidate;
-    if (githubUrl) {
-       candidate = await Candidate.findOneAndUpdate(
-        { githubUrl },
-        {
-          name,
-          role,
-          summary,
-          skills: formattedSkills,
-          experiences,
-          matchReason,
-          embedding,
-          // Update postedAt or updatedAt if we had those fields
-        },
-        { new: true, upsert: true }
+export async function POST(req: NextRequest) {
+  try {
+    await dbConnect();
+    const body = await req.json();
+
+    // Validate required fields
+    if (!body.name || !body.role || !body.skills || !body.email) {
+      return NextResponse.json(
+        { error: "Missing required fields (name, role, skills, email)" },
+        { status: 400 }
       );
-    } else {
-      candidate = await Candidate.create({
-        name,
-        role,
-        summary,
-        skills: formattedSkills,
-        experiences,
-        matchReason,
-        githubUrl,
-        embedding
-      });
     }
 
-    return NextResponse.json({ success: true, data: candidate });
+    // Generate embedding for vector search
+    // Combine role, summary, and skills into a rich text representation
+    const skillText = Array.isArray(body.skills)
+      ? body.skills
+        .map((s: any) => `${s.subject || s.name} (${s.level ?? "n/a"})`)
+        .join(", ")
+      : "";
+
+    const embedParts = [`Role: ${body.role}`];
+    if (body.summary) {
+      embedParts.push(`Summary: ${body.summary}`);
+    }
+    if (skillText) {
+      embedParts.push(`Skills: ${skillText}`);
+    }
+    const textToEmbed = embedParts.join(". ") + ".";
+
+    console.log("-> Generating embedding for candidate:", body.email);
+
+    let embedding;
+    try {
+      embedding = await getEmbedding(textToEmbed);
+      console.log("-> Embedding generated successfully, length:", embedding?.length);
+    } catch (e: any) {
+      console.error("-> OpenAI Embedding Failed:", e.message);
+      return NextResponse.json(
+        { error: `OpenAI Embedding Failed: ${e.message}` },
+        { status: 500 }
+      );
+    }
+
+    // Prepare candidate data
+    console.log("-> Preparing to save to MongoDB...");
+    const candidateData = {
+      name: body.name,
+      role: body.role,
+      summary: body.summary,
+      // Map skills from UI format (subject, A) to Schema format (name, level)
+      // handling both potential input formats for robustness
+      skills: body.skills.map((s: any) => ({
+        name: s.subject || s.name,
+        level: s.A || s.level,
+        category: s.category || 'General'
+      })),
+      experiences: body.experiences || [],
+      email: body.email,
+      githubUrl: body.githubUrl,
+      matchReason: body.matchReason,
+      embedding: embedding
+    };
+
+    // UPSERT: Update if exists, Insert if not
+    const savedCandidate = await Candidate.findOneAndUpdate(
+      { email: body.email },
+      candidateData,
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    console.log("-> MongoDB Save Success. ID:", savedCandidate._id);
+
+    return NextResponse.json({ success: true, data: savedCandidate });
 
   } catch (error: any) {
-    console.error("Save Candidate Error:", error);
-    return NextResponse.json({ success: false, error: "Failed to save candidate" }, { status: 500 });
+    console.error("-> Save Profile Error (Catch Block):", error);
+    return NextResponse.json(
+      { error: `Internal Server Error: ${error.message}` },
+      { status: 500 }
+    );
   }
 }

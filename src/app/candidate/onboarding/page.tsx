@@ -11,7 +11,7 @@ import { DragEvent, useEffect, useRef, useState } from "react";
 import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer } from 'recharts';
 import { toast } from "sonner";
 
-// 定义 API 返回的数据类型
+// Define API return data types
 interface AnalysisResult {
   name: string;
   role: string;
@@ -41,7 +41,7 @@ export default function OnboardingPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Loading 状态下的文字轮播效果
+  // Text carousel effect under Loading state
   useEffect(() => {
     if (isLoading) {
       const texts = [

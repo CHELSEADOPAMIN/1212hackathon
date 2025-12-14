@@ -1,27 +1,26 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { 
-  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer 
-} from 'recharts';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Plus, Pencil, Trash2, Briefcase, Sparkles, MapPin, DollarSign } from "lucide-react";
+import { Briefcase, DollarSign, MapPin, Pencil, Plus, Radar as RadarIcon, Sparkles, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  PolarAngleAxis,
+  PolarGrid,
+  PolarRadiusAxis,
+  RadarChart,
+  Radar as RadarShape,
+  ResponsiveContainer
+} from "recharts";
 
-// 默认技能数据（如果没有从 Onboarding 过来）
-const DEFAULT_SKILLS = [
-  { subject: 'Coding', A: 95, fullMark: 100 },
-  { subject: 'System Design', A: 88, fullMark: 100 },
-  { subject: 'Leadership', A: 75, fullMark: 100 },
-  { subject: 'Product Sense', A: 85, fullMark: 100 },
-  { subject: 'Communication', A: 80, fullMark: 100 },
-];
+// Default skill data (if not from Onboarding)
+const DEFAULT_SKILLS: SkillPoint[] = [];
 
 interface Experience {
   id: string;
@@ -31,24 +30,94 @@ interface Experience {
   description: string;
 }
 
+interface SkillPoint {
+  subject: string;
+  A: number;
+  fullMark?: number;
+}
+
 interface UserProfile {
   name: string;
   role: string;
   summary: string;
-  skills: { subject: string; A: number }[];
+  skills: SkillPoint[];
   experiences?: Experience[];
 }
 
+const normalizeSkills = (skills: any): SkillPoint[] => {
+  if (!Array.isArray(skills) || skills.length === 0) return DEFAULT_SKILLS;
+
+  const clampedSkills = skills
+    .map((skill: any, index: number) => {
+      const subject = skill.subject || skill.name || skill.category || `Skill ${index + 1}`;
+      const rawLevel = skill.A ?? skill.level ?? skill.score ?? 0;
+      const level = Number.isFinite(rawLevel) ? rawLevel : 0;
+      const boundedLevel = Math.max(0, Math.min(100, level));
+
+      return subject
+        ? { subject, A: boundedLevel, fullMark: 100 }
+        : null;
+    })
+    .filter(Boolean) as SkillPoint[];
+
+  return clampedSkills.length > 0 ? clampedSkills : DEFAULT_SKILLS;
+};
+
+const normalizeExperiences = (experiences: any): Experience[] => {
+  if (!Array.isArray(experiences)) return [];
+
+  return experiences.map((exp: any, index: number) => ({
+    id: exp.id || exp._id || `exp-${index}`,
+    role: exp.role || exp.title || "Role",
+    company: exp.company || exp.organization || "Company",
+    period: exp.period || exp.duration || "",
+    description: exp.description || exp.details || "",
+  }));
+};
+
+const wrapPolarLabel = (value: string, maxPerLine = 18): string[] => {
+  const words = value.split(/\s+/);
+  const lines: string[] = [];
+  let current = "";
+
+  words.forEach((word) => {
+    if ((current + " " + word).trim().length > maxPerLine) {
+      lines.push(current.trim());
+      current = word;
+    } else {
+      current = `${current} ${word}`.trim();
+    }
+  });
+
+  if (current) lines.push(current);
+  return lines;
+};
+
+const renderAngleTick = ({ payload, x, y }: any) => {
+  const value = payload?.value ? String(payload.value) : "";
+  const lines = wrapPolarLabel(value);
+
+  return (
+    <text x={x} y={y} textAnchor="middle" fill="#475569" fontSize={12}>
+      {lines.map((line, index) => (
+        <tspan key={index} x={x} dy={index === 0 ? 0 : 14}>
+          {line}
+        </tspan>
+      ))}
+    </text>
+  );
+};
+
 export default function MyProfilePage() {
   const [profile, setProfile] = useState<UserProfile>({
-    name: "Alex Chen",
-    role: "Senior Full Stack Developer",
-    summary: "Alex demonstrates exceptional proficiency in full-stack development...",
+    name: "Guest",
+    role: "Explorer",
+    summary: "Please complete your profile to see AI insights.",
     skills: DEFAULT_SKILLS,
     experiences: []
   });
 
-  // 状态管理：Job Preferences
+  // State management: Job Preferences
   const [preferences, setPreferences] = useState({
     role: "Full Stack Developer",
     location: "Remote / NYC",
@@ -56,47 +125,35 @@ export default function MyProfilePage() {
   });
   const [isPrefDialogOpen, setIsPrefDialogOpen] = useState(false);
   const [tempPref, setTempPref] = useState(preferences);
+  const [mounted, setMounted] = useState(false);
 
-  // 状态管理：工作经历
-  const [experiences, setExperiences] = useState<Experience[]>([
-    {
-      id: "1",
-      role: "Senior Full Stack Developer",
-      company: "TechGiant Corp",
-      period: "2021 - Present",
-      description: "Led the migration of legacy monolith to microservices architecture. Improved system reliability by 99.9% and reduced deployment time by 50%."
-    },
-    {
-      id: "2",
-      role: "Frontend Engineer",
-      company: "StartupInc",
-      period: "2019 - 2021",
-      description: "Built the core product dashboard using React and TypeScript. Collaborated closely with design team to implement pixel-perfect UI."
-    }
-  ]);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  // 读取 Onboarding 产生的数据
+  // State management: Work experience
+  const [experiences, setExperiences] = useState<Experience[]>([]);
+
+  // Read data generated from Onboarding
   useEffect(() => {
     const savedProfile = localStorage.getItem('userProfile');
     if (savedProfile) {
       try {
         const parsed = JSON.parse(savedProfile);
-        setProfile({
-          name: parsed.name,
-          role: parsed.role,
-          summary: parsed.summary,
-          skills: parsed.skills,
-          experiences: parsed.experiences
-        });
-        
+        const normalizedSkills = normalizeSkills(parsed.skills);
+        const normalizedExperiences = normalizeExperiences(parsed.experiences);
+
+        setProfile((prev) => ({
+          name: parsed.name || prev.name,
+          role: parsed.role || prev.role,
+          summary: parsed.summary || prev.summary,
+          skills: normalizedSkills,
+          experiences: normalizedExperiences
+        }));
+
         // If we have experiences from AI, override the mock ones
-        if (parsed.experiences && parsed.experiences.length > 0) {
-          // Assign IDs if missing
-          const experiencesWithIds = parsed.experiences.map((exp: any, index: number) => ({
-            ...exp,
-            id: exp.id || `ai-${index}`
-          }));
-          setExperiences(experiencesWithIds);
+        if (normalizedExperiences.length > 0) {
+          setExperiences(normalizedExperiences);
         }
       } catch (e) {
         console.error("Failed to load profile", e);
@@ -104,7 +161,7 @@ export default function MyProfilePage() {
     }
   }, []);
 
-  // 编辑/新增表单状态
+  // Edit/add form state
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentExp, setCurrentExp] = useState<Partial<Experience>>({});
 
@@ -114,14 +171,14 @@ export default function MyProfilePage() {
 
   const handleSave = () => {
     if (currentExp.id) {
-      // 编辑模式
-      setExperiences(experiences.map(exp => 
+      // Edit mode
+      setExperiences(experiences.map(exp =>
         exp.id === currentExp.id ? { ...exp, ...currentExp } as Experience : exp
       ));
     } else {
-      // 新增模式
+      // Add mode
       setExperiences([
-        ...experiences, 
+        ...experiences,
         { ...currentExp, id: Date.now().toString() } as Experience
       ]);
     }
@@ -146,10 +203,10 @@ export default function MyProfilePage() {
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto animate-in fade-in duration-500">
-      
-      {/* 1. 顶部区域：身份与战力 */}
+
+      {/* 1. Top area: Identity and strength */}
       <div className="grid md:grid-cols-3 gap-6">
-        {/* 左侧：个人信息卡片 */}
+        {/* Left: Personal information card */}
         <Card className="md:col-span-1 shadow-md border-0 bg-white/80 backdrop-blur">
           <CardContent className="pt-8 flex flex-col items-center text-center space-y-4">
             <div className="relative">
@@ -164,7 +221,7 @@ export default function MyProfilePage() {
             <div className="w-full">
               <h2 className="text-2xl font-bold text-slate-900">{profile.name}</h2>
               <p className="text-blue-600 font-medium">{profile.role}</p>
-              
+
               {/* Job Preferences Section */}
               <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-2">
                 <div className="flex items-center justify-between">
@@ -181,18 +238,18 @@ export default function MyProfilePage() {
                         <DialogDescription>Set your career expectations.</DialogDescription>
                       </DialogHeader>
                       <div className="grid gap-4 py-4">
-                         <div className="space-y-2">
-                           <Label>Target Role</Label>
-                           <Input value={tempPref.role} onChange={(e) => setTempPref({...tempPref, role: e.target.value})} />
-                         </div>
-                         <div className="space-y-2">
-                           <Label>Location</Label>
-                           <Input value={tempPref.location} onChange={(e) => setTempPref({...tempPref, location: e.target.value})} />
-                         </div>
-                         <div className="space-y-2">
-                           <Label>Expected Salary</Label>
-                           <Input value={tempPref.salary} onChange={(e) => setTempPref({...tempPref, salary: e.target.value})} />
-                         </div>
+                        <div className="space-y-2">
+                          <Label>Target Role</Label>
+                          <Input value={tempPref.role} onChange={(e) => setTempPref({ ...tempPref, role: e.target.value })} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Location</Label>
+                          <Input value={tempPref.location} onChange={(e) => setTempPref({ ...tempPref, location: e.target.value })} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Expected Salary</Label>
+                          <Input value={tempPref.salary} onChange={(e) => setTempPref({ ...tempPref, salary: e.target.value })} />
+                        </div>
                       </div>
                       <DialogFooter>
                         <Button onClick={handleSavePreferences}>Save Preferences</Button>
@@ -200,7 +257,7 @@ export default function MyProfilePage() {
                     </DialogContent>
                   </Dialog>
                 </div>
-                
+
                 <div className="flex flex-wrap gap-2 justify-center">
                   <Badge variant="outline" className="flex items-center gap-1 border-slate-200 text-slate-600">
                     <Briefcase className="w-3 h-3" />
@@ -227,35 +284,47 @@ export default function MyProfilePage() {
           </CardContent>
         </Card>
 
-        {/* 右侧：雷达图 */}
+        {/* Right: Radar chart */}
         <Card className="md:col-span-2 shadow-md border-0 bg-white/80 backdrop-blur">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Radar className="w-5 h-5 text-blue-500" />
+              <RadarIcon className="w-5 h-5 text-blue-500" />
               Skill Radar
             </CardTitle>
           </CardHeader>
           <CardContent className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={profile.skills}>
-                <PolarGrid stroke="#e2e8f0" />
-                <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 12 }} />
-                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                <Radar
-                  name="Skill"
-                  dataKey="A"
-                  stroke="#2563eb"
-                  strokeWidth={3}
-                  fill="#3b82f6"
-                  fillOpacity={0.3}
-                />
-              </RadarChart>
-            </ResponsiveContainer>
+            {mounted ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart
+                  cx="50%"
+                  cy="50%"
+                  outerRadius="80%"
+                  data={profile.skills}
+                  margin={{ top: 16, right: 32, bottom: 16, left: 32 }}
+                >
+                  <PolarGrid stroke="#e2e8f0" />
+                  <PolarAngleAxis dataKey="subject" tick={renderAngleTick} />
+                  <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                  <RadarShape
+                    name="Skill"
+                    dataKey="A"
+                    stroke="#2563eb"
+                    strokeWidth={3}
+                    fill="#3b82f6"
+                    fillOpacity={0.3}
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full w-full flex items-center justify-center text-slate-400">
+                Loading chart...
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* 2. 中部区域：AI 总结 */}
+      {/* 2. Middle area: AI summary */}
       <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-100 shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-blue-700">
@@ -270,7 +339,7 @@ export default function MyProfilePage() {
         </CardContent>
       </Card>
 
-      {/* 3. 底部区域：工作经历 */}
+      {/* 3. Bottom area: Work experience */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
