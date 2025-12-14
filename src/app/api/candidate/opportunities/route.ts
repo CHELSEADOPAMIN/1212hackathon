@@ -1,21 +1,40 @@
 import { getMatchesCollection, hydrateMatchRecords, serializeMatch } from "@/lib/matches";
 import { findJobsForCandidate } from "@/lib/matching";
-import { Match, MatchStatus } from "@/lib/types";
+import { Match, MatchStatus, type CandidateProfileInput, type Job } from "@/lib/types";
 import { NextRequest, NextResponse } from "next/server";
 
 // Only show "company_interested" in spotlight. "matched" should go to the matches page.
 const SPOTLIGHT_STATUSES: MatchStatus[] = ["company_interested"];
 
-const toStringId = (value: any) => {
+type IdLike = string | number | { toString(): string } | null | undefined;
+
+const toStringId = (value: IdLike) => {
   if (!value) return "";
   if (typeof value === "string") return value;
   if (typeof value === "number") return String(value);
-  if (typeof value === "object" && (value as any).toString) return (value as any).toString();
+  if (typeof value === "object" && "toString" in value) return value.toString();
   return "";
 };
 
+type JobLike = Partial<Job> & { _id?: IdLike; score?: number; jobSnapshot?: Match["jobSnapshot"] };
+
+interface FormattedJob {
+  _id: string;
+  id: string;
+  title?: string;
+  company?: string;
+  location?: string;
+  salary?: string;
+  description?: string;
+  requirements: string[];
+  score?: number;
+  matchStatus?: MatchStatus;
+  matchId?: string;
+  companyId?: string;
+}
+
 const formatJob = (
-  job: any,
+  job: JobLike,
   extra?: {
     matchStatus?: MatchStatus;
     matchId?: string;
@@ -24,9 +43,15 @@ const formatJob = (
     jobSnapshot?: Match["jobSnapshot"];
     jobId?: string;
   }
-) => {
+): FormattedJob => {
   const normalizedId = toStringId(job?._id) || job?.id || extra?.jobId || "";
   const base = job?.jobSnapshot || extra?.jobSnapshot;
+  const requirements = Array.isArray(job?.requirements)
+    ? job.requirements
+    : Array.isArray(base?.requirements)
+      ? base.requirements
+      : [];
+
   const normalizedCompanyId =
     toStringId(extra?.companyId) ||
     toStringId(job?.companyId) ||
@@ -41,7 +66,7 @@ const formatJob = (
     location: job?.location || base?.location,
     salary: job?.salary || base?.salary || "—",
     description: job?.description || base?.description || "",
-    requirements: job?.requirements || base?.requirements || [],
+    requirements,
     score: job?.score || extra?.matchScore,
     matchStatus: extra?.matchStatus,
     matchId: extra?.matchId,
@@ -51,8 +76,11 @@ const formatJob = (
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { profile, candidateId } = body || {};
+    const body = (await req.json()) as {
+      profile?: CandidateProfileInput;
+      candidateId?: string;
+    };
+    const { profile, candidateId } = body;
 
     if (!profile) {
       return NextResponse.json({ success: false, error: "Missing profile" }, { status: 400 });
@@ -64,7 +92,7 @@ export async function POST(req: NextRequest) {
     ]);
 
     let spotlight: Match[] = [];
-    let interactedJobIds = new Set<string>();
+    const interactedJobIds = new Set<string>();
 
     if (candidateId) {
       // Fetch ALL matches for this candidate to exclude them from recommendations
@@ -91,18 +119,20 @@ export async function POST(req: NextRequest) {
     const spotlightJobs = hydratedSpotlight
       .map((match) => {
         const serialized = serializeMatch(match);
-        const jobData = match.job || match.jobSnapshot || {};
+        if (!serialized) return null;
+
+        const jobData = (match.job as JobLike) || (match.jobSnapshot as JobLike) || {};
 
         return formatJob(jobData, {
           matchStatus: match.status,
-          matchId: (serialized as any)._id,
+          matchId: serialized._id || "",
           matchScore: match.matchScore,
-          companyId: (serialized as any).companyId,
+          companyId: serialized.companyId,
           jobSnapshot: match.jobSnapshot,
-          jobId: (serialized as any).jobId,
+          jobId: serialized.jobId,
         });
       })
-      .filter((job) => job.id);
+      .filter((job): job is FormattedJob => Boolean(job?.id));
 
     // Filter out ANY job that has an existing match record (spotlight or otherwise)
     const recommendedJobs = recommendations
@@ -112,8 +142,9 @@ export async function POST(req: NextRequest) {
     const merged = [...spotlightJobs, ...recommendedJobs];
 
     return NextResponse.json({ success: true, matches: merged });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Candidate opportunities error:", error);
-    return NextResponse.json({ success: false, error: error.message || "Server error" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Server error";
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

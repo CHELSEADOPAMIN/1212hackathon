@@ -63,9 +63,10 @@ export default function Discover() {
       if (!data.matches || data.matches.length === 0) {
         toast.info("No candidates found yet. Try broadening the requirements.");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(error.message || "Failed to search candidates");
+      const message = error instanceof Error ? error.message : "Failed to search candidates";
+      toast.error(message);
     } finally {
       setLoading(false);
     }

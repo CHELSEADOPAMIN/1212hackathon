@@ -20,9 +20,29 @@ import {
   TrendingUp,
   X
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Candidate, useCompany } from "../context";
+
+type RawSkill = { subject?: string; name?: string; category?: string; level?: number; A?: number };
+
+interface PipelineMatchResponse {
+  _id?: string;
+  status: MatchStatus;
+  matchScore?: number;
+  candidate?: {
+    _id?: string;
+    id?: string;
+    name?: string;
+    role?: string;
+    avatar?: string;
+    skills?: RawSkill[];
+    summary?: string;
+  };
+  candidateSnapshot?: PipelineMatchResponse["candidate"];
+  job?: { title?: string; location?: string };
+  jobSnapshot?: { title?: string; location?: string };
+}
 
 export default function ProcessTrackerPage() {
   const {
@@ -47,13 +67,16 @@ export default function ProcessTrackerPage() {
   // Bidding input status
   const [offerInput, setOfferInput] = useState<string>("");
 
-  const normalizeSkills = (skills: any[] = []) =>
-    skills.map((s, index) => ({
-      subject: s.subject || s.name || s.category || `Skill ${index + 1}`,
-      A: Math.max(0, Math.min(100, s.A ?? s.level ?? 70)),
-    }));
+  const normalizeSkills = useCallback(
+    (skills: RawSkill[] = []): Candidate["skills"] =>
+      skills.map((s, index) => ({
+        subject: s.subject || s.name || s.category || `Skill ${index + 1}`,
+        A: Math.max(0, Math.min(100, s.A ?? s.level ?? 70)),
+      })),
+    []
+  );
 
-  const loadPipeline = async () => {
+  const loadPipeline = useCallback(async () => {
     try {
       setLoadingPipeline(true);
       const companyId = companyData?._id;
@@ -71,7 +94,8 @@ export default function ProcessTrackerPage() {
         throw new Error(data.error || "Failed to load pipeline");
       }
 
-      const formatted = (data.data || []).map((item: any) => {
+      const apiMatches: PipelineMatchResponse[] = data.data || [];
+      const formatted = apiMatches.map((item) => {
         const candidateData = item.candidate || item.candidateSnapshot || {};
         const candidate: Candidate = {
           id: candidateData._id || candidateData.id || (crypto.randomUUID?.() ?? Date.now().toString()),
@@ -99,11 +123,11 @@ export default function ProcessTrackerPage() {
     } finally {
       setLoadingPipeline(false);
     }
-  };
+  }, [companyData?._id, normalizeSkills]);
 
   useEffect(() => {
     loadPipeline();
-  }, [companyData?._id]);
+  }, [loadPipeline]);
 
   useEffect(() => {
     return () => {
@@ -494,7 +518,7 @@ export default function ProcessTrackerPage() {
                       <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-700 flex gap-2">
                         <Info className="w-5 h-5 flex-shrink-0" />
                         <p>
-                          AI Prediction: An offer of <span className="font-bold">$188,000</span> has a 85% chance of being accepted based on candidate's preferences.
+                          AI Prediction: An offer of <span className="font-bold">$188,000</span> has a 85% chance of being accepted based on candidate&rsquo;s preferences.
                         </p>
                       </div>
                     </div>

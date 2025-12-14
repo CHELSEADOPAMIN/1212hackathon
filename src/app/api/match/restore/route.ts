@@ -1,6 +1,7 @@
 import { getMatchesCollection, serializeMatch } from "@/lib/matches";
-import { ObjectId } from "mongodb";
+import { ObjectId, type UpdateFilter } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
+import type { Match } from "@/lib/types";
 
 export async function PATCH(req: NextRequest) {
   try {
@@ -19,27 +20,28 @@ export async function PATCH(req: NextRequest) {
     const now = new Date();
 
     // 撤销软删除，将状态恢复为候选人感兴趣
-    const updateData: any = {
+    const updateData: UpdateFilter<Match> = {
       $unset: { isSoftDeleted: "" }, // 移除软删除标记
       $set: {
-        status: status || "candidate_interested", // 恢复为候选人感兴趣状态
+        status: (status as Match["status"]) || "candidate_interested",
         updatedAt: now,
       },
     };
 
-    const result = await collection.findOneAndUpdate(
+    const { value } = await collection.findOneAndUpdate(
       { _id: new ObjectId(matchId) },
       updateData,
       { returnDocument: "after" }
     );
 
-    if (!result) {
+    if (!value) {
       return NextResponse.json({ success: false, error: "Match not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, data: serializeMatch(result) });
-  } catch (error: any) {
+    return NextResponse.json({ success: true, data: serializeMatch(value) });
+  } catch (error: unknown) {
     console.error("Restore match error:", error);
-    return NextResponse.json({ success: false, error: error.message || "Server error" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Server error";
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

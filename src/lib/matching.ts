@@ -6,7 +6,7 @@ import {
   Job,
   JobProfileInput,
 } from "@/lib/types";
-import { ObjectId } from "mongodb";
+import { ObjectId, type Document } from "mongodb";
 
 const JOBS_VECTOR_INDEX = process.env.MONGODB_JOBS_INDEX || "vector_index";
 const CANDIDATES_VECTOR_INDEX = process.env.MONGODB_CANDIDATES_INDEX || "vector_index";
@@ -65,7 +65,7 @@ export async function findJobsForCandidate(profile: CandidateProfileInput, exclu
     .filter(id => ObjectId.isValid(id))
     .map(id => new ObjectId(id));
 
-  const pipeline: any[] = [
+  const pipeline: Document[] = [
     {
       $vectorSearch: {
         index: JOBS_VECTOR_INDEX,
@@ -108,7 +108,7 @@ export async function findCandidatesForJob(jobInput: JobProfileInput, excludeIds
     .filter(id => ObjectId.isValid(id))
     .map(id => new ObjectId(id));
 
-  const pipeline: any[] = [
+  const pipeline: Document[] = [
     {
       $vectorSearch: {
         index: CANDIDATES_VECTOR_INDEX,

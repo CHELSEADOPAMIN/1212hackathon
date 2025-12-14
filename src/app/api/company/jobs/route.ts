@@ -19,12 +19,12 @@ export async function GET(req: NextRequest) {
     const jobs = await Job.find({ companyId }).sort({ postedAt: -1 });
 
     return NextResponse.json({ success: true, data: jobs });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Fetch Jobs Error:", error);
+    const message = error instanceof Error ? error.message : "Internal Server Error";
     return NextResponse.json(
-      { error: error.message || "Internal Server Error" },
+      { error: message },
       { status: 500 }
     );
   }
 }
-

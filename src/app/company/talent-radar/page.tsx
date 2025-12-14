@@ -18,6 +18,20 @@ interface JobOption {
   title: string;
 }
 
+interface ApiJob {
+  _id: string;
+  title: string;
+}
+
+interface ApiCandidate {
+  _id: string;
+  name: string;
+  role: string;
+  avatar?: string;
+  skills?: Array<string | { name?: string; level?: number }>;
+  summary?: string;
+}
+
 export default function TalentRadarPage() {
   const { companyData } = useCompany();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -46,7 +60,7 @@ export default function TalentRadarPage() {
         const data = await res.json();
 
         if (data.success && data.data.length > 0) {
-          const jobOptions = data.data.map((j: any) => ({ id: j._id, title: j.title }));
+          const jobOptions = data.data.map((j: ApiJob) => ({ id: j._id, title: j.title }));
           setJobs(jobOptions);
           // Default select the first job
           setSelectedJobId(jobOptions[0].id);
@@ -87,17 +101,26 @@ export default function TalentRadarPage() {
         const data = await response.json();
 
         if (data.matches && data.matches.length > 0) {
-          const formattedCandidates = data.matches.map((c: any) => ({
-            id: c._id,
-            name: c.name,
-            role: c.role,
-            avatar: c.avatar || "https://github.com/shadcn.png",
-            skills: c.skills.map((s: any) => ({
-              subject: typeof s === 'string' ? s : s.name,
-              A: typeof s === 'object' && s.level ? s.level : 0
-            })).slice(0, 5),
-            summary: c.summary,
-          }));
+          const formattedCandidates = data.matches.map((c: ApiCandidate) => {
+            const skills = (c.skills ?? []).map((skill) => {
+              if (typeof skill === "string") {
+                return { subject: skill, A: 0 };
+              }
+              return {
+                subject: skill.name || "Skill",
+                A: skill.level ?? 0
+              };
+            }).slice(0, 5);
+
+            return {
+              id: c._id,
+              name: c.name,
+              role: c.role,
+              avatar: c.avatar || "https://github.com/shadcn.png",
+              skills,
+              summary: c.summary,
+            };
+          });
           setCandidates(formattedCandidates);
           setCurrentIndex(0);
         } else {
@@ -113,7 +136,7 @@ export default function TalentRadarPage() {
     };
 
     fetchCandidates();
-  }, [selectedJobId]);
+  }, [selectedJobId, companyData?._id]);
 
 
   const currentCandidate = candidates[currentIndex];

@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Generate Embedding
-    let embedding = [];
+    let embedding: number[] = [];
     try {
       // 组合关键信息进行 Embedding
       const textToEmbed = `Job Title: ${title}. Company: ${company}. Description: ${description}. Requirements: ${description}`; // 简化处理，把描述也当需求
@@ -43,12 +43,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, data: newJob });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Save Job Error:", error);
+    const message = error instanceof Error ? error.message : "Internal Server Error";
     return NextResponse.json(
-      { error: error.message || "Internal Server Error" },
+      { error: message },
       { status: 500 }
     );
   }
 }
-

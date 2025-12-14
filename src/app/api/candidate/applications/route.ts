@@ -49,10 +49,11 @@ export async function GET(req: NextRequest) {
     }));
 
     return NextResponse.json({ success: true, data });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Candidate applications error:", error);
+    const message = error instanceof Error ? error.message : "Server error";
     return NextResponse.json(
-      { success: false, error: error.message || "Server error" },
+      { success: false, error: message },
       { status: 500 }
     );
   }

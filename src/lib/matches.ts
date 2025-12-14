@@ -9,6 +9,8 @@ import {
 } from "@/lib/types";
 import { ObjectId } from "mongodb";
 
+type IdLike = string | number | ObjectId | { toString(): string } | null | undefined;
+
 export interface SwipePayload {
   actor: "company" | "candidate";
   action: "like" | "reject";
@@ -22,22 +24,25 @@ export interface SwipePayload {
 
 const MATCH_COLLECTION = "matches";
 
-const stringifyId = (value: unknown) => {
+const stringifyId = (value: IdLike) => {
   if (!value) return "";
   if (typeof value === "string") return value;
+  if (typeof value === "number") return value.toString();
   if (value instanceof ObjectId) return value.toHexString();
-  if (typeof value === "object" && (value as any).toString) return (value as any).toString();
+  if (typeof value === "object" && "toString" in value) return value.toString();
   return "";
 };
 
-export function serializeMatch(match: Match | null) {
+type MatchWithId = Match & { _id?: IdLike; candidateId: IdLike; jobId: IdLike };
+
+export function serializeMatch(match: MatchWithId | null) {
   if (!match) return null;
   return {
     ...match,
     _id: stringifyId(match._id),
-    candidateId: stringifyId((match as any).candidateId),
-    jobId: stringifyId((match as any).jobId),
-  } as Match & { _id?: string };
+    candidateId: stringifyId(match.candidateId),
+    jobId: stringifyId(match.jobId),
+  } as Match & { _id?: string; candidateId: string; jobId: string };
 }
 
 export async function getMatchesCollection() {
@@ -58,7 +63,7 @@ export async function upsertSwipe(payload: SwipePayload): Promise<Match> {
     const rejectStatus: MatchStatus =
       payload.actor === "candidate" ? "rejected_by_candidate" : "rejected";
 
-    const result = await collection.findOneAndUpdate(
+    const { value } = await collection.findOneAndUpdate(
       query,
       {
         $set: {
@@ -77,11 +82,11 @@ export async function upsertSwipe(payload: SwipePayload): Promise<Match> {
       { returnDocument: "after", upsert: true }
     );
 
-    if (!result) {
+    if (!value) {
       throw new Error("Failed to write reject action");
     }
 
-    return result;
+    return value;
   }
 
   const existing = await collection.findOne(query);
@@ -101,8 +106,8 @@ export async function upsertSwipe(payload: SwipePayload): Promise<Match> {
       candidateSnapshot: payload.candidateSnapshot,
     };
 
-    const { insertedId } = await collection.insertOne(doc as any);
-    return { ...doc, _id: insertedId } as Match;
+    const { insertedId } = await collection.insertOne(doc);
+    return { ...doc, _id: insertedId };
   }
 
   const nextStatus: MatchStatus =
@@ -114,7 +119,7 @@ export async function upsertSwipe(payload: SwipePayload): Promise<Match> {
         ? "matched"
         : "candidate_interested";
 
-  const result = await collection.findOneAndUpdate(
+  const { value: updatedMatch } = await collection.findOneAndUpdate(
     { _id: existing._id },
     {
       $set: {
@@ -133,11 +138,11 @@ export async function upsertSwipe(payload: SwipePayload): Promise<Match> {
     { returnDocument: "after" }
   );
 
-  if (!result) {
+  if (!updatedMatch) {
     throw new Error("Failed to update match");
   }
 
-  return result;
+  return updatedMatch;
 }
 
 export async function updateMatchStatus(
@@ -152,7 +157,7 @@ export async function updateMatchStatus(
   const collection = await getMatchesCollection();
   const now = new Date();
 
-  const result = await collection.findOneAndUpdate(
+  const { value } = await collection.findOneAndUpdate(
     { _id: new ObjectId(matchId) },
     {
       $set: {
@@ -164,11 +169,11 @@ export async function updateMatchStatus(
     { returnDocument: "after" }
   );
 
-  return result;
+  return value ?? null;
 }
 
 export const hydrateMatchRecords = async (
-  matches: Match[]
+  matches: MatchWithId[]
 ): Promise<
   Array<
     Match & {
@@ -181,11 +186,11 @@ export const hydrateMatchRecords = async (
   if (!matches.length) return [];
 
   const candidateIds = matches
-    .map((m) => m.candidateId)
+    .map((m) => stringifyId(m.candidateId))
     .filter((id) => ObjectId.isValid(id))
     .map((id) => new ObjectId(id));
   const jobIds = matches
-    .map((m) => m.jobId)
+    .map((m) => stringifyId(m.jobId))
     .filter((id) => ObjectId.isValid(id))
     .map((id) => new ObjectId(id));
 
@@ -219,9 +224,15 @@ export const hydrateMatchRecords = async (
     jobMap.set(stringifyId(doc._id), doc);
   });
 
-  return matches.map((match) => ({
-    ...serializeMatch(match),
-    candidate: candidateMap.get(stringifyId((match as any).candidateId)) || null,
-    job: jobMap.get(stringifyId((match as any).jobId)) || null,
-  }));
+  return matches.map((match) => {
+    const serialized = serializeMatch(match)!;
+    const candidateKey = stringifyId(match.candidateId);
+    const jobKey = stringifyId(match.jobId);
+
+    return {
+      ...serialized,
+      candidate: candidateMap.get(candidateKey) || null,
+      job: jobMap.get(jobKey) || null,
+    };
+  });
 };

@@ -46,8 +46,9 @@ export async function GET(req: NextRequest) {
     }));
 
     return NextResponse.json({ success: true, data });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Pipeline fetch error:", error);
-    return NextResponse.json({ success: false, error: error.message || "Server error" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Server error";
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

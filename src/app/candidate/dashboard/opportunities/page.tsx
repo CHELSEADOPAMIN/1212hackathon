@@ -10,6 +10,8 @@ import { DollarSign, Heart, Info, Loader2, MapPin, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+type IdLike = string | number | { toString(): string } | null | undefined;
+
 interface Job {
   id: string;
   company: string;
@@ -26,7 +28,23 @@ interface Job {
   isSpotlight?: boolean;
 }
 
-const toStringId = (value: any) => {
+interface JobApi {
+  _id?: IdLike;
+  id?: IdLike;
+  company?: string;
+  companyId?: IdLike;
+  title?: string;
+  salary?: string;
+  location?: string;
+  requirements?: string[];
+  description?: string;
+  score?: number;
+  matchScore?: number;
+  matchStatus?: MatchStatus;
+  matchId?: string;
+}
+
+const toStringId = (value: IdLike) => {
   if (!value) return "";
   if (typeof value === "string") return value;
   if (typeof value === "number") return String(value);
@@ -64,13 +82,14 @@ export default function OpportunitiesPage() {
         const data = await response.json();
 
         if (data.matches && data.matches.length > 0) {
-          const formattedJobs = data.matches.map((job: any) => {
+          const formattedJobs = (data.matches as JobApi[]).map((job) => {
             const score = typeof job.score === 'number'
               ? job.score
               : (typeof job.matchScore === 'number' ? job.matchScore : undefined);
             const normalizedScore = score !== undefined ? Math.max(0, Math.min(1, score)) : 0.65;
             const matchStatus: MatchStatus | undefined = job.matchStatus;
             const isSpotlight = matchStatus === 'company_interested' || matchStatus === 'matched';
+            const requirements = Array.isArray(job.requirements) ? job.requirements.slice(0, 3) : [];
 
             return {
               id: toStringId(job._id || job.id),
@@ -80,7 +99,7 @@ export default function OpportunitiesPage() {
               salary: job.salary || 'TBD',
               location: job.location || 'Remote',
               match: Math.round(normalizedScore * 100),
-              tags: job.requirements ? job.requirements.slice(0, 3) : [],
+              tags: requirements,
               description: job.description || 'No description available yet.',
               reason: isSpotlight
                 ? 'They are already interested in you. Swipe right for instant matching.'
@@ -252,7 +271,7 @@ export default function OpportunitiesPage() {
 
                   <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
                     <p className="text-xs text-emerald-800 italic leading-relaxed">
-                      "AI: {currentJob.reason}"
+                      &ldquo;AI: {currentJob.reason}&rdquo;
                     </p>
                   </div>
                 </div>

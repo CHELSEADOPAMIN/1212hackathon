@@ -1,7 +1,7 @@
 import { getCollection } from "@/lib/db";
 import { Candidate, Job } from "@/lib/db/models";
 import dbConnect from "@/lib/db/mongodb";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 // 简单的余弦相似度计算函数
 function cosineSimilarity(vecA: number[], vecB: number[]) {
@@ -17,7 +17,7 @@ function cosineSimilarity(vecA: number[], vecB: number[]) {
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     await dbConnect();
 
@@ -73,8 +73,8 @@ export async function GET(req: NextRequest) {
         },
       ];
       dbSearchResult = await collection.aggregate(pipeline).toArray();
-    } catch (e: any) {
-      dbSearchError = e.message;
+    } catch (e: unknown) {
+      dbSearchError = e instanceof Error ? e.message : "Unknown error";
     }
 
     return NextResponse.json({
@@ -97,9 +97,8 @@ export async function GET(req: NextRequest) {
       }
     });
 
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-
-

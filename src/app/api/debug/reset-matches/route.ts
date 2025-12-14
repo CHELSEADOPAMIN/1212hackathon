@@ -1,7 +1,7 @@
 import { getMatchesCollection } from "@/lib/matches";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   try {
     const collection = await getMatchesCollection();
     // 清空 matches 集合
@@ -11,9 +11,8 @@ export async function POST(req: NextRequest) {
       success: true,
       message: "All match history cleared. Candidates should reappear in Talent Radar."
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-
-

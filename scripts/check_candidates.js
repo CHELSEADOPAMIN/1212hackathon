@@ -1,4 +1,4 @@
-const { MongoClient } = require('mongodb');
+import { MongoClient } from "mongodb";
 
 // URI from your debug script
 const uri = "mongodb+srv://yangqiqi789_db_user:QixinYang1228@cluster0.rz4e1mv.mongodb.net/?appName=Cluster0";
