@@ -100,14 +100,22 @@ const wrapPolarLabel = (value: string, maxPerLine = 18): string[] => {
   return lines;
 };
 
-const renderAngleTick = ({ payload, x, y }: { payload?: { value?: string }; x?: number; y?: number }) => {
+type AngleTickProps = {
+  payload?: { value?: string | number };
+  x?: number | string;
+  y?: number | string;
+};
+
+const renderAngleTick = ({ payload, x, y }: AngleTickProps) => {
   const value = payload?.value ? String(payload.value) : "";
   const lines = wrapPolarLabel(value);
+  const xPos = typeof x === "number" ? x : Number(x ?? 0);
+  const yPos = typeof y === "number" ? y : Number(y ?? 0);
 
   return (
-    <text x={x} y={y} textAnchor="middle" fill="#475569" fontSize={12}>
+    <text x={xPos} y={yPos} textAnchor="middle" fill="#475569" fontSize={12}>
       {lines.map((line, index) => (
-        <tspan key={index} x={x} dy={index === 0 ? 0 : 14}>
+        <tspan key={index} x={xPos} dy={index === 0 ? 0 : 14}>
           {line}
         </tspan>
       ))}

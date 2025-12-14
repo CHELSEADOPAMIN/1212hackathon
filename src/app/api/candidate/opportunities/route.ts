@@ -16,7 +16,12 @@ const toStringId = (value: IdLike) => {
   return "";
 };
 
-type JobLike = Partial<Job> & { _id?: IdLike; score?: number; jobSnapshot?: Match["jobSnapshot"] };
+type JobLike = Partial<Job> & {
+  _id?: IdLike;
+  id?: IdLike;
+  score?: number;
+  jobSnapshot?: Match["jobSnapshot"];
+};
 
 interface FormattedJob {
   _id: string;
@@ -44,7 +49,11 @@ const formatJob = (
     jobId?: string;
   }
 ): FormattedJob => {
-  const normalizedId = toStringId(job?._id) || job?.id || extra?.jobId || "";
+  const normalizedId =
+    toStringId(job?._id) ||
+    toStringId(job?.id) ||
+    toStringId(extra?.jobId) ||
+    "";
   const base = job?.jobSnapshot || extra?.jobSnapshot;
   const requirements = Array.isArray(job?.requirements)
     ? job.requirements
@@ -86,10 +95,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Missing profile" }, { status: 400 });
     }
 
-    const [matchesCollection, recommendations] = await Promise.all([
-      getMatchesCollection(),
-      findJobsForCandidate(profile),
-    ]);
+    const matchesCollection = await getMatchesCollection();
+    const recommendations = (await findJobsForCandidate(profile)) as JobLike[];
 
     let spotlight: Match[] = [];
     const interactedJobIds = new Set<string>();
@@ -136,7 +143,7 @@ export async function POST(req: NextRequest) {
 
     // Filter out ANY job that has an existing match record (spotlight or otherwise)
     const recommendedJobs = recommendations
-      .filter((job) => !interactedJobIds.has(toStringId(job._id || job.id)))
+      .filter((job) => !interactedJobIds.has(toStringId(job._id) || toStringId(job.id)))
       .map((job) => formatJob(job));
 
     const merged = [...spotlightJobs, ...recommendedJobs];

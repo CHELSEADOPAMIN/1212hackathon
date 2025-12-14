@@ -90,15 +90,12 @@ async function main() {
     });
 
     console.log(`Found ${matchedJobs.length} jobs.`);
-    // @ts-expect-error -- score is appended by the matching pipeline at runtime
     const targetJobFound = matchedJobs.find(j => j.company === jobData.company);
     
     if (targetJobFound) {
-        // @ts-expect-error -- score is appended by the matching pipeline at runtime
         console.log(`✅ SUCCESS: Found target job "${targetJobFound.title}" with score: ${targetJobFound.score}`);
     } else {
         console.error("❌ FAILURE: Target job not found in top results.");
-        // @ts-expect-error -- score is appended by the matching pipeline at runtime
         console.log("Top results:", matchedJobs.map(j => ({ t: j.title, c: j.company, s: j.score })));
     }
 
@@ -114,15 +111,12 @@ async function main() {
     });
 
     console.log(`Found ${matchedCandidates.length} candidates.`);
-    // @ts-expect-error -- score is appended by the matching pipeline at runtime
     const targetCandidateFound = matchedCandidates.find(c => c.name === candidateData.name);
 
     if (targetCandidateFound) {
-        // @ts-expect-error -- score is appended by the matching pipeline at runtime
         console.log(`✅ SUCCESS: Found target candidate "${targetCandidateFound.name}" with score: ${targetCandidateFound.score}`);
     } else {
         console.error("❌ FAILURE: Target candidate not found in top results.");
-        // @ts-expect-error -- score is appended by the matching pipeline at runtime
         console.log("Top results:", matchedCandidates.map(c => ({ n: c.name, r: c.role, s: c.score })));
     }
 

@@ -28,17 +28,19 @@ export async function PATCH(req: NextRequest) {
       },
     };
 
-    const { value } = await collection.findOneAndUpdate(
+    const updateResult = await collection.findOneAndUpdate(
       { _id: new ObjectId(matchId) },
       updateData,
       { returnDocument: "after" }
     );
 
-    if (!value) {
+    const updatedMatch = updateResult ?? null;
+
+    if (!updatedMatch) {
       return NextResponse.json({ success: false, error: "Match not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, data: serializeMatch(value) });
+    return NextResponse.json({ success: true, data: serializeMatch(updatedMatch) });
   } catch (error: unknown) {
     console.error("Restore match error:", error);
     const message = error instanceof Error ? error.message : "Server error";

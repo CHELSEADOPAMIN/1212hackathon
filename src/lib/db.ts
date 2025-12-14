@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection } from "mongodb";
+import { MongoClient, Db, Collection, type Document } from "mongodb";
 
 const uri = process.env.MONGODB_URI;
 const dbName = process.env.MONGODB_DB || "lyrathon";
@@ -30,7 +30,7 @@ export async function getDb(): Promise<Db> {
   return client.db(dbName);
 }
 
-export async function getCollection<T>(name: string): Promise<Collection<T>> {
+export async function getCollection<T extends Document>(name: string): Promise<Collection<T>> {
   const db = await getDb();
   return db.collection<T>(name);
 }

@@ -63,7 +63,7 @@ export async function upsertSwipe(payload: SwipePayload): Promise<Match> {
     const rejectStatus: MatchStatus =
       payload.actor === "candidate" ? "rejected_by_candidate" : "rejected";
 
-    const { value } = await collection.findOneAndUpdate(
+    const resultDoc = await collection.findOneAndUpdate(
       query,
       {
         $set: {
@@ -82,11 +82,11 @@ export async function upsertSwipe(payload: SwipePayload): Promise<Match> {
       { returnDocument: "after", upsert: true }
     );
 
-    if (!value) {
+    if (!resultDoc) {
       throw new Error("Failed to write reject action");
     }
 
-    return value;
+    return resultDoc;
   }
 
   const existing = await collection.findOne(query);
@@ -119,7 +119,7 @@ export async function upsertSwipe(payload: SwipePayload): Promise<Match> {
         ? "matched"
         : "candidate_interested";
 
-  const { value: updatedMatch } = await collection.findOneAndUpdate(
+  const updatedMatch = await collection.findOneAndUpdate(
     { _id: existing._id },
     {
       $set: {
@@ -157,7 +157,7 @@ export async function updateMatchStatus(
   const collection = await getMatchesCollection();
   const now = new Date();
 
-  const { value } = await collection.findOneAndUpdate(
+  const value = await collection.findOneAndUpdate(
     { _id: new ObjectId(matchId) },
     {
       $set: {
@@ -202,25 +202,27 @@ export const hydrateMatchRecords = async (
   const [candidateDocs, jobDocs] = await Promise.all([
     candidateIds.length
       ? candidatesCollection
-        .find({ _id: { $in: candidateIds } })
+        .find<Candidate>({ _id: { $in: candidateIds } })
         .project({ embedding: 0 })
         .toArray()
       : [],
     jobIds.length
       ? jobsCollection
-        .find({ _id: { $in: jobIds } })
+        .find<Job>({ _id: { $in: jobIds } })
         .project({ embedding: 0 })
         .toArray()
       : [],
   ]);
 
   const candidateMap = new Map<string, Candidate>();
-  candidateDocs.forEach((doc) => {
+  const typedCandidateDocs = candidateDocs as Candidate[];
+  typedCandidateDocs.forEach((doc) => {
     candidateMap.set(stringifyId(doc._id), doc);
   });
 
   const jobMap = new Map<string, Job>();
-  jobDocs.forEach((doc) => {
+  const typedJobDocs = jobDocs as Job[];
+  typedJobDocs.forEach((doc) => {
     jobMap.set(stringifyId(doc._id), doc);
   });
 

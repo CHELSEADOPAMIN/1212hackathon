@@ -1,4 +1,4 @@
-import { ObjectId } from "mongodb";
+import { ObjectId, type Document } from "mongodb";
 
 export type EmbeddingVector = number[];
 
@@ -16,7 +16,7 @@ export interface Experience {
   description: string;
 }
 
-export interface Candidate {
+export interface Candidate extends Document {
   _id?: ObjectId;
   name: string;
   role: string;
@@ -29,7 +29,7 @@ export interface Candidate {
   embedding: EmbeddingVector;
 }
 
-export interface Job {
+export interface Job extends Document {
   _id?: ObjectId;
   title: string;
   company: string;
