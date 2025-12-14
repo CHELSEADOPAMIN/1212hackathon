@@ -41,10 +41,10 @@ export default function ProcessTrackerPage() {
   const [loadingPipeline, setLoadingPipeline] = useState(true);
   const [pendingRejects, setPendingRejects] = useState<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  // 视频播放状态 mock
+  // Video playback status mock
   const [isPlaying, setIsPlaying] = useState(false);
 
-  // 竞价输入状态
+  // Bidding input status
   const [offerInput, setOfferInput] = useState<string>("");
 
   const normalizeSkills = (skills: any[] = []) =>
@@ -59,7 +59,7 @@ export default function ProcessTrackerPage() {
       const companyId = companyData?._id;
       if (!companyId) {
         setPipeline([]);
-        toast.error("请先登录公司账户");
+        toast.error("Please log in to your company account first");
         setLoadingPipeline(false);
         return;
       }
@@ -95,7 +95,7 @@ export default function ProcessTrackerPage() {
       setPipeline(formatted);
     } catch (error) {
       console.error("Pipeline fetch error:", error);
-      toast.error("加载候选人列表失败");
+      toast.error("Failed to load candidate list");
     } finally {
       setLoadingPipeline(false);
     }
@@ -128,10 +128,10 @@ export default function ProcessTrackerPage() {
     try {
       await updateStatus(matchId, "matched");
       await loadPipeline();
-      toast.success("已接受候选人，进入匹配状态");
+      toast.success("Candidate accepted, entering match status");
     } catch (error) {
       console.error("Accept error:", error);
-      toast.error("接受失败，请稍后再试");
+      toast.error("Acceptance failed. Please try again later");
     }
   };
 
@@ -142,7 +142,7 @@ export default function ProcessTrackerPage() {
         await loadPipeline();
       } catch (error) {
         console.error("Reject error:", error);
-        toast.error("拒绝失败，请稍后再试");
+        toast.error("Rejection failed. Please try again later");
       } finally {
         setPendingRejects((prev) => {
           const copy = { ...prev };
@@ -180,10 +180,10 @@ export default function ProcessTrackerPage() {
     try {
       await updateStatus(matchId, "interview_pending");
       await loadPipeline();
-      toast.success("面试已创建", { description: "候选人已收到 AI 面试邀请" });
+      toast.success("Interview created", { description: "Candidate has received AI interview invitation" });
     } catch (error) {
       console.error("Interview setup error:", error);
-      toast.error("创建面试失败");
+      toast.error("Failed to create interview");
     }
   };
 
@@ -191,10 +191,10 @@ export default function ProcessTrackerPage() {
     try {
       await updateStatus(matchId, "rejected", true);
       await loadPipeline();
-      toast.success("已移除该匹配");
+      toast.success("Match removed");
     } catch (error) {
       console.error("Remove error:", error);
-      toast.error("操作失败，请稍后再试");
+      toast.error("Operation failed. Please try again later");
     }
   };
 

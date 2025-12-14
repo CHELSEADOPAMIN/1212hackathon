@@ -4,9 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { DollarSign, Heart, Info, Loader2, MapPin, X } from "lucide-react";
-import type { MatchStatus } from "@/lib/types";
 import { DEFAULT_COMPANY_ID } from "@/lib/constants";
+import type { MatchStatus } from "@/lib/types";
+import { DollarSign, Heart, Info, Loader2, MapPin, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -83,8 +83,8 @@ export default function OpportunitiesPage() {
               tags: job.requirements ? job.requirements.slice(0, 3) : [],
               description: job.description || 'No description available yet.',
               reason: isSpotlight
-                ? '他们已经对你感兴趣，右滑即可即时配对。'
-                : '基于技能与偏好相似度的智能推荐。',
+                ? 'They are already interested in you. Swipe right for instant matching.'
+                : 'Smart recommendations based on skill and preference similarity.',
               matchStatus,
               matchId: job.matchId || job._id || job.id,
               isSpotlight,
@@ -152,28 +152,28 @@ export default function OpportunitiesPage() {
 
         const status: MatchStatus | undefined = data.data?.status;
         const toastMessage = dir === 'right'
-          ? (status === 'matched' ? '双向匹配成功' : '已发送你的兴趣')
-          : '你已跳过该职位';
+          ? (status === 'matched' ? 'Bidirectional match successful' : 'Your interest has been sent')
+          : 'You have skipped this position';
 
         const toastDescription = dir === 'right'
           ? (status === 'matched'
-            ? '已和公司形成匹配，快去查看面试安排。'
-            : '等待公司回应，我们会同步更新状态。')
-          : '该职位将从推荐中移除。';
+            ? 'Matched with company. Go check interview arrangements.'
+            : 'Waiting for company response. We will update status synchronously.')
+          : 'This position will be removed from recommendations.';
 
         toast.success(toastMessage, { description: toastDescription });
       } catch (error) {
         console.error('Swipe update failed:', error);
-        toast.error('无法更新匹配状态，请稍后再试。', {
+        toast.error('Unable to update match status. Please try again later.', {
           description: (error as Error).message,
         });
       }
     } else if (!candidateId) {
-      toast.error("未找到个人档案，请重新登录后再试。");
+      toast.error("Personal profile not found. Please log in again and try.");
     } else if (!companyId) {
-      toast.error("职位数据缺失公司信息，暂无法操作。");
+      toast.error("Job data missing company information. Unable to operate temporarily.");
     } else if (!jobId) {
-      toast.error("职位缺少 ID，无法完成操作。");
+      toast.error("Job missing ID. Unable to complete operation.");
     }
 
     setTimeout(() => {
@@ -182,7 +182,7 @@ export default function OpportunitiesPage() {
     }, nextCardDelay);
   };
 
-  // 动画 Class 计算
+  // Animation class calculation
   let cardClass = "h-full shadow-xl border-2 border-slate-100 bg-white overflow-hidden transition-all duration-300 ease-in-out transform";
   if (direction === 'left') {
     cardClass += " -translate-x-full opacity-0 rotate-[-10deg]";

@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +13,7 @@ import {
   Trash2,
   Video,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 type MatchRecord = {
@@ -102,7 +102,7 @@ export default function ApplicationsPage() {
     if (!candidateId) {
       setLoading(false);
       setInterviewLoading(false);
-      toast.error("未找到候选人信息，请先完成登录或入职引导。");
+      toast.error("Candidate information not found. Please complete login or onboarding first.");
       return;
     }
 
@@ -112,7 +112,7 @@ export default function ApplicationsPage() {
         const data = await res.json();
 
         if (!res.ok || !data.success) {
-          throw new Error(data.error || "无法加载申请数据");
+          throw new Error(data.error || "Unable to load application data");
         }
 
         const matches: MatchRecord[] = data.data || [];
@@ -146,7 +146,7 @@ export default function ApplicationsPage() {
         setPendingApps(nextPending);
       } catch (error) {
         console.error("Load applications error:", error);
-        toast.error("加载申请列表失败", {
+        toast.error("Failed to load application list", {
           description: (error as Error).message,
         });
       } finally {
@@ -160,7 +160,7 @@ export default function ApplicationsPage() {
         const data = await res.json();
 
         if (!res.ok || !data.success) {
-          throw new Error(data.error || "无法加载面试数据");
+          throw new Error(data.error || "Unable to load interview data");
         }
 
         const nextInterviews: InterviewCard[] = (data.data || []).map((item: InterviewRecord) => {
@@ -169,7 +169,7 @@ export default function ApplicationsPage() {
             id: toStringId((item as any)._id || crypto.randomUUID()),
             company: job.company || "Hiring Company",
             role: job.title || "Open Role",
-            time: item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "待安排",
+            time: item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "To be scheduled",
             type: job.type || "AI Interview",
             status: item.status,
           };
@@ -178,7 +178,7 @@ export default function ApplicationsPage() {
         setInterviews(nextInterviews);
       } catch (error) {
         console.error("Load interviews error:", error);
-        toast.error("加载面试数据失败", {
+        toast.error("Failed to load interview data", {
           description: (error as Error).message,
         });
       } finally {
@@ -199,30 +199,30 @@ export default function ApplicationsPage() {
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || "撤销申请失败");
+        throw new Error(data.error || "Failed to withdraw application");
       }
 
       setPendingApps((prev) => prev.filter((item) => item.id !== matchId));
-      toast.success("已撤销申请", { description: "该职位将不会再显示在列表中。" });
+      toast.success("Application withdrawn", { description: "This position will no longer appear in your list." });
     } catch (error) {
       console.error("Withdraw error:", error);
-      toast.error("撤销失败", { description: (error as Error).message });
+      toast.error("Withdrawal failed", { description: (error as Error).message });
     }
   };
 
   const handleStartInterview = (status: MatchStatus) => {
     if (status !== "interview_pending") {
-      toast.info("HR 正在准备面试，请稍后再试。");
+      toast.info("HR is preparing the interview. Please try again later.");
       return;
     }
-    toast.success("启动 AI 面试...");
+    toast.success("Starting AI interview...");
   };
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto animate-in fade-in duration-500">
       <div className="space-y-1">
         <h1 className="text-3xl font-bold text-slate-900">Application Tracker</h1>
-        <p className="text-slate-500">从匹配到面试，全面掌握申请进度。</p>
+        <p className="text-slate-500">Track your application progress from matching to interview.</p>
       </div>
 
       {/* OFFERS */}
@@ -240,7 +240,7 @@ export default function ApplicationsPage() {
           <div className="p-6 border border-dashed rounded-xl text-slate-400">Loading offers...</div>
         ) : offers.length === 0 ? (
           <div className="p-6 border border-dashed rounded-xl text-slate-400">
-            暂无 Offer，继续探索机会。
+            No offers yet. Continue exploring opportunities.
           </div>
         ) : (
           <div className="grid md:grid-cols-2 gap-4">
@@ -269,10 +269,10 @@ export default function ApplicationsPage() {
                 </CardContent>
                 <CardFooter className="flex gap-3">
                   <Button variant="outline" className="flex-1 border-green-200 hover:bg-green-100 text-green-800">
-                    查看邀请函
+                    View Invitation
                   </Button>
                   <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white">
-                    接受 Offer
+                    Accept Offer
                   </Button>
                 </CardFooter>
               </Card>
@@ -293,7 +293,7 @@ export default function ApplicationsPage() {
           </div>
         ) : interviews.length === 0 ? (
           <div className="p-6 text-center text-slate-400 border border-dashed rounded-xl">
-            暂无即将到来的面试，保持关注。
+            No upcoming interviews. Stay tuned.
           </div>
         ) : (
           <div className="grid md:grid-cols-2 gap-4">
@@ -321,7 +321,7 @@ export default function ApplicationsPage() {
                       <Clock className="w-6 h-6" />
                     </div>
                     <div>
-                      <p className="font-semibold text-slate-900">{job.time || "待安排"}</p>
+                      <p className="font-semibold text-slate-900">{job.time || "To be scheduled"}</p>
                       <p className="text-sm text-slate-500">{job.type}</p>
                     </div>
                   </div>

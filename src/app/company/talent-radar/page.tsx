@@ -122,7 +122,7 @@ export default function TalentRadarPage() {
     const companyId = companyData?._id || DEFAULT_COMPANY_ID;
     if (!selectedJobId) return;
     if (!companyId) {
-      toast.error("请先登录公司账户后再操作");
+      toast.error("Please log in to your company account before proceeding");
       return;
     }
 
@@ -153,11 +153,11 @@ export default function TalentRadarPage() {
           }
 
           toast.success("Candidate Saved", {
-            description: `${currentCandidate.name} 已加入 Process Tracker。`,
+            description: `${currentCandidate.name} has been added to Process Tracker.`,
           });
         } catch (error) {
           console.error("Save match error:", error);
-          toast.error("保存失败，请稍后重试");
+          toast.error("Save failed, please try again later");
         }
       }
       setCurrentIndex((prev) => prev + 1);

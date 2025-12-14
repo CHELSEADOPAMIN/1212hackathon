@@ -19,7 +19,7 @@ import {
   ResponsiveContainer
 } from "recharts";
 
-// 默认技能数据（如果没有从 Onboarding 过来）
+// Default skill data (if not from Onboarding)
 const DEFAULT_SKILLS: SkillPoint[] = [];
 
 interface Experience {
@@ -117,7 +117,7 @@ export default function MyProfilePage() {
     experiences: []
   });
 
-  // 状态管理：Job Preferences
+  // State management: Job Preferences
   const [preferences, setPreferences] = useState({
     role: "Full Stack Developer",
     location: "Remote / NYC",
@@ -131,10 +131,10 @@ export default function MyProfilePage() {
     setMounted(true);
   }, []);
 
-  // 状态管理：工作经历
+  // State management: Work experience
   const [experiences, setExperiences] = useState<Experience[]>([]);
 
-  // 读取 Onboarding 产生的数据
+  // Read data generated from Onboarding
   useEffect(() => {
     const savedProfile = localStorage.getItem('userProfile');
     if (savedProfile) {
@@ -161,7 +161,7 @@ export default function MyProfilePage() {
     }
   }, []);
 
-  // 编辑/新增表单状态
+  // Edit/add form state
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentExp, setCurrentExp] = useState<Partial<Experience>>({});
 
@@ -171,12 +171,12 @@ export default function MyProfilePage() {
 
   const handleSave = () => {
     if (currentExp.id) {
-      // 编辑模式
+      // Edit mode
       setExperiences(experiences.map(exp =>
         exp.id === currentExp.id ? { ...exp, ...currentExp } as Experience : exp
       ));
     } else {
-      // 新增模式
+      // Add mode
       setExperiences([
         ...experiences,
         { ...currentExp, id: Date.now().toString() } as Experience
@@ -204,9 +204,9 @@ export default function MyProfilePage() {
   return (
     <div className="space-y-8 max-w-5xl mx-auto animate-in fade-in duration-500">
 
-      {/* 1. 顶部区域：身份与战力 */}
+      {/* 1. Top area: Identity and strength */}
       <div className="grid md:grid-cols-3 gap-6">
-        {/* 左侧：个人信息卡片 */}
+        {/* Left: Personal information card */}
         <Card className="md:col-span-1 shadow-md border-0 bg-white/80 backdrop-blur">
           <CardContent className="pt-8 flex flex-col items-center text-center space-y-4">
             <div className="relative">
@@ -284,7 +284,7 @@ export default function MyProfilePage() {
           </CardContent>
         </Card>
 
-        {/* 右侧：雷达图 */}
+        {/* Right: Radar chart */}
         <Card className="md:col-span-2 shadow-md border-0 bg-white/80 backdrop-blur">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -324,7 +324,7 @@ export default function MyProfilePage() {
         </Card>
       </div>
 
-      {/* 2. 中部区域：AI 总结 */}
+      {/* 2. Middle area: AI summary */}
       <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-100 shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-blue-700">
@@ -339,7 +339,7 @@ export default function MyProfilePage() {
         </CardContent>
       </Card>
 
-      {/* 3. 底部区域：工作经历 */}
+      {/* 3. Bottom area: Work experience */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">

@@ -99,7 +99,7 @@ export default function JobsPage() {
 
   const handleSaveJob = async () => {
     if (!companyData?._id) {
-      toast.error("请先登录公司账户再发布职位");
+      toast.error("Please log in to your company account before posting a job");
       return;
     }
 

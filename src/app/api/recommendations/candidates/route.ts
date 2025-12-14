@@ -21,12 +21,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Job data or valid Job ID is required" }, { status: 400 });
     }
 
-    // 1. 获取已互动的候选人 ID 列表
+    // 1. Get list of candidate IDs that have been interacted with
     const matchesCollection = await getMatchesCollection();
 
-    // 使用传入的 jobId 和 假设的 companyId (或者从 Job 中获取)
-    // 注意：这里我们假设 companyId 是 DEFAULT_COMPANY_ID，或者从请求中传过来。
-    // 在真实场景中，应该从 Session 或 Token 获取 Company ID。
+    // Use passed jobId and assumed companyId (or get from Job)
+    // Note: Here we assume companyId is DEFAULT_COMPANY_ID, or passed from request.
+    // In real scenarios, should get Company ID from Session or Token.
     const companyId =
       body.companyId ||
       job?.companyId?.toString?.() ||
