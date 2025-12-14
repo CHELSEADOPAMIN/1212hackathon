@@ -1,9 +1,10 @@
-import { findJobsForCandidate } from "@/lib/matching";
 import { getMatchesCollection, hydrateMatchRecords, serializeMatch } from "@/lib/matches";
+import { findJobsForCandidate } from "@/lib/matching";
 import { Match, MatchStatus } from "@/lib/types";
 import { NextRequest, NextResponse } from "next/server";
 
-const SPOTLIGHT_STATUSES: MatchStatus[] = ["company_interested", "matched"];
+// Only show "company_interested" in spotlight. "matched" should go to the matches page.
+const SPOTLIGHT_STATUSES: MatchStatus[] = ["company_interested"];
 
 const toStringId = (value: any) => {
   if (!value) return "";
@@ -63,16 +64,26 @@ export async function POST(req: NextRequest) {
     ]);
 
     let spotlight: Match[] = [];
+    let interactedJobIds = new Set<string>();
 
     if (candidateId) {
-      spotlight = await matchesCollection
-        .find({
-          candidateId,
-          status: { $in: SPOTLIGHT_STATUSES },
-          $or: [{ isSoftDeleted: { $exists: false } }, { isSoftDeleted: false }],
-        })
+      // Fetch ALL matches for this candidate to exclude them from recommendations
+      // We include soft-deleted ones (rejections) because we don't want to show them again
+      const allMatches = await matchesCollection
+        .find({ candidateId })
         .sort({ matchScore: -1, updatedAt: -1 })
         .toArray();
+
+      // Collect all job IDs that the candidate has already interacted with
+      allMatches.forEach((m) => {
+        if (m.jobId) interactedJobIds.add(toStringId(m.jobId));
+      });
+
+      // Filter spotlight items: only "company_interested" and NOT soft deleted
+      spotlight = allMatches.filter((m) =>
+        SPOTLIGHT_STATUSES.includes(m.status) &&
+        (m.isSoftDeleted === false || m.isSoftDeleted === undefined)
+      );
     }
 
     const hydratedSpotlight = await hydrateMatchRecords(spotlight);
@@ -93,10 +104,9 @@ export async function POST(req: NextRequest) {
       })
       .filter((job) => job.id);
 
-    const spotlightJobIds = new Set(spotlightJobs.map((j) => j.id));
-
+    // Filter out ANY job that has an existing match record (spotlight or otherwise)
     const recommendedJobs = recommendations
-      .filter((job) => !spotlightJobIds.has(job._id?.toString?.() || ""))
+      .filter((job) => !interactedJobIds.has(toStringId(job._id || job.id)))
       .map((job) => formatJob(job));
 
     const merged = [...spotlightJobs, ...recommendedJobs];
