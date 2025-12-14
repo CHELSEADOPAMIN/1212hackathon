@@ -39,8 +39,20 @@ export async function POST(req: NextRequest) {
 
     // Generate embedding for vector search
     // Combine role, summary, and skills into a rich text representation
-    const skillText = body.skills.map((s: any) => `${s.name} (${s.level})`).join(", ");
-    const textToEmbed = `Role: ${body.role}. Summary: ${body.summary}. Skills: ${skillText}.`;
+    const skillText = Array.isArray(body.skills)
+      ? body.skills
+        .map((s: any) => `${s.subject || s.name} (${s.level ?? "n/a"})`)
+        .join(", ")
+      : "";
+
+    const embedParts = [`Role: ${body.role}`];
+    if (body.summary) {
+      embedParts.push(`Summary: ${body.summary}`);
+    }
+    if (skillText) {
+      embedParts.push(`Skills: ${skillText}`);
+    }
+    const textToEmbed = embedParts.join(". ") + ".";
 
     console.log("-> Generating embedding for candidate:", body.email);
 

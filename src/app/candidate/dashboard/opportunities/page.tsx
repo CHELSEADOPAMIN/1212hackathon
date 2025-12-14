@@ -65,9 +65,10 @@ export default function OpportunitiesPage() {
 
         if (data.matches && data.matches.length > 0) {
           const formattedJobs = data.matches.map((job: any) => {
-            const rawScore = typeof job.score === 'number' ? job.score : (typeof job.matchScore === 'number' ? job.matchScore : undefined);
-            const score = rawScore ?? undefined;
-            const normalizedScore = score ? Math.max(0, Math.min(1, score)) : 0.65;
+            const score = typeof job.score === 'number'
+              ? job.score
+              : (typeof job.matchScore === 'number' ? job.matchScore : undefined);
+            const normalizedScore = score !== undefined ? Math.max(0, Math.min(1, score)) : 0.65;
             const matchStatus: MatchStatus | undefined = job.matchStatus;
             const isSpotlight = matchStatus === 'company_interested' || matchStatus === 'matched';
 

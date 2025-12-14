@@ -133,6 +133,8 @@ export default function JobsPage() {
         const formattedJob: Job = {
           id: savedJob._id,
           title: savedJob.title,
+          description: savedJob.description,
+          salary: savedJob.salary,
           applicants: 0,
           matches: 0,
           views: 0,
@@ -141,7 +143,12 @@ export default function JobsPage() {
         };
 
         if (editingId) {
-          setJobs(jobs.map(j => j.id === editingId ? { ...j, title: savedJob.title } : j));
+          setJobs(jobs.map(j => j.id === editingId ? {
+            ...j,
+            title: savedJob.title,
+            salary: savedJob.salary,
+            description: savedJob.description
+          } : j));
           toast.success("Job Updated Successfully");
         } else {
           setJobs([formattedJob, ...jobs]);

@@ -64,7 +64,7 @@ export async function upsertSwipe(payload: SwipePayload): Promise<Match> {
         $set: {
           status: rejectStatus,
           updatedAt: now,
-          isSoftDeleted: payload.actor === "company" ? true : false,
+          isSoftDeleted: true,
         },
         $setOnInsert: {
           initiator: payload.actor,
@@ -225,4 +225,3 @@ export const hydrateMatchRecords = async (
     job: jobMap.get(stringifyId((match as any).jobId)) || null,
   }));
 };
-
