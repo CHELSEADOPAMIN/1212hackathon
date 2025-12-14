@@ -104,7 +104,38 @@ const CompanySchema: Schema = new Schema({
   logoUrl: { type: String },
 });
 
+// --- Interview Model ---
+
+export interface IInterview extends Document {
+  matchId: mongoose.Types.ObjectId | string;
+  questions: string[];
+  status: 'scheduled' | 'completed';
+  recordingUrl?: string;
+  createdAt: Date;
+}
+
+const InterviewSchema: Schema = new Schema(
+  {
+    // Mixed type keeps compatibility with ObjectId and mock string IDs
+    matchId: { type: Schema.Types.Mixed, required: true, index: true },
+    questions: {
+      type: [String],
+      default: [],
+      validate: {
+        validator: (arr: string[]) => Array.isArray(arr) && arr.length > 0,
+        message: 'At least one question is required',
+      },
+    },
+    status: { type: String, enum: ['scheduled', 'completed'], default: 'scheduled' },
+    recordingUrl: { type: String },
+  },
+  {
+    timestamps: { createdAt: true, updatedAt: true },
+  }
+);
+
 // Avoid OverwriteModelError
 export const Job: Model<IJob> = mongoose.models.Job || mongoose.model<IJob>('Job', JobSchema);
 export const Candidate: Model<ICandidate> = mongoose.models.Candidate || mongoose.model<ICandidate>('Candidate', CandidateSchema);
 export const Company: Model<ICompany> = mongoose.models.Company || mongoose.model<ICompany>('Company', CompanySchema);
+export const Interview: Model<IInterview> = mongoose.models.Interview || mongoose.model<IInterview>('Interview', InterviewSchema);

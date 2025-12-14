@@ -13,6 +13,7 @@ import {
   Trash2,
   Video,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -38,8 +39,14 @@ type MatchRecord = {
   updatedAt?: string;
 };
 
-type InterviewRecord = MatchRecord & {
-  candidate?: Record<string, unknown> | null;
+type InterviewApiRecord = {
+  _id?: string;
+  matchId?: string;
+  status: "scheduled" | "completed";
+  recordingUrl?: string;
+  createdAt?: string;
+  questions?: string[];
+  match?: MatchRecord | null;
 };
 
 interface OfferCard {
@@ -63,7 +70,9 @@ interface InterviewCard {
   role: string;
   time: string;
   type: string;
-  status: MatchStatus;
+  status: "scheduled" | "completed";
+  recordingUrl?: string;
+  matchStatus?: MatchStatus;
 }
 
 const toStringId = (value: IdLike) => {
@@ -74,8 +83,8 @@ const toStringId = (value: IdLike) => {
   return "";
 };
 
-const getJobInfo = (match: MatchRecord) => {
-  return match.job || match.jobSnapshot || {};
+const getJobInfo = (match: Partial<MatchRecord> | null | undefined) => {
+  return match?.job || match?.jobSnapshot || {};
 };
 
 const buildExpiryLabel = (updatedAt?: string) => {
@@ -92,6 +101,7 @@ export default function ApplicationsPage() {
   const [interviews, setInterviews] = useState<InterviewCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [interviewLoading, setInterviewLoading] = useState(true);
+  const router = useRouter();
 
   const candidateId = useMemo(() => {
     if (typeof window === "undefined") return "";
@@ -159,23 +169,26 @@ export default function ApplicationsPage() {
 
     const fetchInterviews = async () => {
       try {
-        const res = await fetch(`/api/candidate/interviews?candidateId=${candidateId}`);
+        const res = await fetch(`/api/interview/upcoming?candidateId=${candidateId}`);
         const data = await res.json();
 
-        if (!res.ok || !data.success) {
+        if (!res.ok || data?.success === false) {
           throw new Error(data.error || "Unable to load interview data");
         }
 
-        const nextInterviews: InterviewCard[] = (data.data || []).map((item: InterviewRecord) => {
-          const job = getJobInfo(item);
-          const matchId = toStringId(item._id || crypto.randomUUID());
+        const nextInterviews: InterviewCard[] = (data.data || []).map((item: InterviewApiRecord) => {
+          const job = getJobInfo(item.match);
+          const id = toStringId(item._id || item.matchId || crypto.randomUUID());
+          const time = item.createdAt ? new Date(item.createdAt).toLocaleString() : "To be scheduled";
           return {
-            id: matchId,
+            id,
             company: job.company || "Hiring Company",
             role: job.title || "Open Role",
-            time: item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "To be scheduled",
+            time,
             type: job.type || "AI Interview",
             status: item.status,
+            recordingUrl: item.recordingUrl,
+            matchStatus: item.match?.status,
           };
         });
 
@@ -215,12 +228,16 @@ export default function ApplicationsPage() {
     }
   };
 
-  const handleStartInterview = (status: MatchStatus) => {
-    if (status !== "interview_pending") {
-      toast.info("HR is preparing the interview. Please try again later.");
+  const handleStartInterview = (interview: InterviewCard) => {
+    if (interview.status !== "scheduled") {
+      toast.info("Interview not available", {
+        description: interview.recordingUrl
+          ? "面试录像已提交，HR 正在审核。"
+          : "请等待 HR 完成面试准备。",
+      });
       return;
     }
-    toast.success("Starting AI interview...");
+    router.push(`/interview/${interview.id}`);
   };
 
   return (
@@ -302,46 +319,56 @@ export default function ApplicationsPage() {
           </div>
         ) : (
           <div className="grid md:grid-cols-2 gap-4">
-            {interviews.map((job) => (
-              <Card key={job.id} className="border-2 border-blue-100 shadow-md">
-                <CardHeader className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>{job.company}</CardTitle>
-                    <CardDescription>{job.role}</CardDescription>
-                  </div>
-                  <Badge
-                    variant={job.status === "interview_pending" ? "default" : "secondary"}
-                    className={
-                      job.status === "interview_pending"
-                        ? "bg-blue-600 hover:bg-blue-600"
-                        : "bg-slate-100 text-slate-600"
-                    }
-                  >
-                    {job.status === "interview_pending" ? "Ready" : "Waiting for HR"}
-                  </Badge>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
-                      <Clock className="w-6 h-6" />
-                    </div>
+            {interviews.map((job) => {
+              const isReady = job.status === "scheduled";
+              return (
+                <Card key={job.id} className="border-2 border-blue-100 shadow-md">
+                  <CardHeader className="flex items-center justify-between">
                     <div>
-                      <p className="font-semibold text-slate-900">{job.time || "To be scheduled"}</p>
-                      <p className="text-sm text-slate-500">{job.type}</p>
+                      <CardTitle>{job.company}</CardTitle>
+                      <CardDescription>{job.role}</CardDescription>
                     </div>
-                  </div>
-                  <Button
-                    size="lg"
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 disabled:opacity-70"
-                    disabled={job.status !== "interview_pending"}
-                    onClick={() => handleStartInterview(job.status)}
-                  >
-                    Start AI Interview
-                    <ChevronRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+                    <Badge
+                      variant={isReady ? "default" : "secondary"}
+                      className={
+                        isReady
+                          ? "bg-blue-600 hover:bg-blue-600"
+                          : "bg-emerald-100 text-emerald-700"
+                      }
+                    >
+                      {isReady ? "Ready" : "Submitted"}
+                    </Badge>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+                        <Clock className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900">{job.time || "To be scheduled"}</p>
+                        <p className="text-sm text-slate-500">
+                          {job.recordingUrl ? "Recording uploaded" : job.type}
+                        </p>
+                        {job.matchStatus && (
+                          <p className="text-xs text-slate-400">
+                            Match status: {job.matchStatus.replace(/_/g, " ")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      size="lg"
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 disabled:opacity-70"
+                      disabled={!isReady}
+                      onClick={() => handleStartInterview(job)}
+                    >
+                      {isReady ? "Start AI Interview" : "Awaiting Review"}
+                      <ChevronRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </section>

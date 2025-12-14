@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,11 +14,14 @@ import {
   CheckCircle2,
   DollarSign,
   Info,
+  Loader2,
   Pause,
   Play,
+  Plus,
   ThumbsDown,
   ThumbsUp,
   TrendingUp,
+  Trash2,
   X
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -44,6 +48,12 @@ interface PipelineMatchResponse {
   jobSnapshot?: { title?: string; location?: string };
 }
 
+const DEFAULT_INTERVIEW_QUESTIONS = [
+  "请简单介绍一下你最近主导的一个项目，以及最大的技术亮点是什么？",
+  "遇到过最棘手的技术难题是什么？你是如何拆解并解决的？",
+  "你希望加入的团队文化是什么样的？",
+];
+
 export default function ProcessTrackerPage() {
   const {
     companyData,
@@ -66,6 +76,12 @@ export default function ProcessTrackerPage() {
 
   // Bidding input status
   const [offerInput, setOfferInput] = useState<string>("");
+
+  // Interview setup dialog state
+  const [interviewDialogOpen, setInterviewDialogOpen] = useState(false);
+  const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
+  const [questionList, setQuestionList] = useState<string[]>(() => [...DEFAULT_INTERVIEW_QUESTIONS]);
+  const [isScheduling, setIsScheduling] = useState(false);
 
   const normalizeSkills = useCallback(
     (skills: RawSkill[] = []): Candidate["skills"] =>
@@ -200,14 +216,63 @@ export default function ProcessTrackerPage() {
     loadPipeline();
   };
 
-  const handleSetInterview = async (matchId: string) => {
+  const resetInterviewDialog = () => {
+    setActiveMatchId(null);
+    setQuestionList([...DEFAULT_INTERVIEW_QUESTIONS]);
+    setIsScheduling(false);
+  };
+
+  const openInterviewDialog = (matchId: string) => {
+    setActiveMatchId(matchId);
+    setQuestionList([...DEFAULT_INTERVIEW_QUESTIONS]);
+    setInterviewDialogOpen(true);
+  };
+
+  const handleQuestionChange = (index: number, value: string) => {
+    setQuestionList((prev) => prev.map((q, i) => (i === index ? value : q)));
+  };
+
+  const handleAddQuestion = () => {
+    setQuestionList((prev) => [...prev, ""]);
+  };
+
+  const handleRemoveQuestion = (index: number) => {
+    setQuestionList((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmitInterview = async () => {
+    if (!activeMatchId) {
+      toast.error("Missing match id");
+      return;
+    }
+
+    const payloadQuestions = questionList.map((q) => q.trim()).filter(Boolean);
+    if (payloadQuestions.length === 0) {
+      toast.error("请至少填写一个面试问题");
+      return;
+    }
+
     try {
-      await updateStatus(matchId, "interview_pending");
+      setIsScheduling(true);
+      const res = await fetch("/api/interview/setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ matchId: activeMatchId, questions: payloadQuestions }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to schedule interview");
+      }
+      toast.success("Interview scheduled", { description: "候选人已收到 AI 面试邀请链接" });
+      setInterviewDialogOpen(false);
+      resetInterviewDialog();
       await loadPipeline();
-      toast.success("Interview created", { description: "Candidate has received AI interview invitation" });
     } catch (error) {
       console.error("Interview setup error:", error);
-      toast.error("Failed to create interview");
+      const message = error instanceof Error ? error.message : "Failed to create interview";
+      toast.error("Failed to create interview", { description: message });
+    } finally {
+      setIsScheduling(false);
     }
   };
 
@@ -272,7 +337,9 @@ export default function ProcessTrackerPage() {
                     ? { text: "Matched", className: "bg-emerald-100 text-emerald-700" }
                     : item.status === "candidate_interested"
                       ? { text: "Candidate Interested", className: "bg-blue-100 text-blue-700" }
-                      : { text: "Sent by Company", className: "bg-slate-100 text-slate-600" };
+                      : item.status === "interview_pending"
+                        ? { text: "Interview Scheduled", className: "bg-emerald-50 text-emerald-700" }
+                        : { text: "Sent by Company", className: "bg-slate-100 text-slate-600" };
 
                 return (
                   <Card
@@ -348,10 +415,15 @@ export default function ProcessTrackerPage() {
                       {item.status === "matched" && (
                         <Button
                           className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                          onClick={() => handleSetInterview(item.id)}
+                          onClick={() => openInterviewDialog(item.id)}
                         >
                           Set AI Interview
                         </Button>
+                      )}
+                      {item.status === "interview_pending" && (
+                        <div className="rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-700 px-3 py-2 text-sm">
+                          AI 面试邀请已发送，等待候选人完成。
+                        </div>
                       )}
                     </CardContent>
                   </Card>
@@ -535,6 +607,69 @@ export default function ProcessTrackerPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      <Dialog
+        open={interviewDialogOpen}
+        onOpenChange={(open) => {
+          setInterviewDialogOpen(open);
+          if (!open) {
+            resetInterviewDialog();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[640px]">
+          <DialogHeader>
+            <DialogTitle>Setup AI Interview</DialogTitle>
+            <DialogDescription>
+              输入要给候选人的问题，系统会按照顺序朗读。点击保存后，候选人将收到 AI 面试链接。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+            {questionList.map((question, index) => (
+              <div key={index} className="flex items-start gap-3">
+                <span className="mt-3 text-sm text-slate-500">{index + 1}.</span>
+                <div className="flex-1">
+                  <Input
+                    value={question}
+                    onChange={(e) => handleQuestionChange(index, e.target.value)}
+                    placeholder="请输入面试问题"
+                    className="border-slate-200"
+                  />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-slate-400 hover:text-red-600"
+                  onClick={() => handleRemoveQuestion(index)}
+                  disabled={questionList.length <= 1}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleAddQuestion}
+              className="w-full border-dashed border-slate-200 text-slate-600 hover:bg-slate-50"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              添加问题
+            </Button>
+          </div>
+          <DialogFooter className="gap-2">
+            <DialogClose asChild>
+              <Button type="button" variant="ghost" onClick={resetInterviewDialog} disabled={isScheduling}>
+                取消
+              </Button>
+            </DialogClose>
+            <Button type="button" onClick={handleSubmitInterview} disabled={isScheduling}>
+              {isScheduling && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              保存并发送
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
