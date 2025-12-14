@@ -33,7 +33,7 @@ export default function TalentRadarPage() {
     const fetchJobs = async () => {
       try {
         // In a real app, pass the actual company ID
-        const res = await fetch(`/api/matches/jobs?companyId=${DEFAULT_COMPANY_ID}`);
+        const res = await fetch(`/api/company/jobs?companyId=${DEFAULT_COMPANY_ID}`);
         const data = await res.json();
 
         if (data.success && data.data.length > 0) {

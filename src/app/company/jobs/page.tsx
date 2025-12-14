@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { DEFAULT_COMPANY_ID } from "@/lib/constants";
 import {
   Archive,
   CheckCircle2,
@@ -17,8 +18,10 @@ import {
   Users
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useCompany } from "../context";
+
 
 interface Job {
   id: string;
@@ -30,15 +33,40 @@ interface Job {
   postedAt: string;
 }
 
-const INITIAL_JOBS: Job[] = [];
-
-import { useCompany } from "../context";
-
 export default function JobsPage() {
   const router = useRouter();
   const { companyData } = useCompany();
-  const [jobs, setJobs] = useState<Job[]>(INITIAL_JOBS);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Load jobs from DB
+  useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        const res = await fetch(`/api/company/jobs?companyId=${DEFAULT_COMPANY_ID}`); // Use default or companyData.id if available
+        const data = await res.json();
+
+        if (data.success && Array.isArray(data.data)) {
+          const formattedJobs = data.data.map((j: any) => ({
+            id: j._id,
+            title: j.title,
+            applicants: 0, // Mock for now
+            matches: 0, // Mock
+            views: 0, // Mock
+            status: 'active',
+            postedAt: new Date(j.postedAt).toLocaleDateString()
+          }));
+          setJobs(formattedJobs);
+        }
+      } catch (error) {
+        console.error("Failed to load jobs", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchJobs();
+  }, []);
 
   // New Job Form State
   const [formData, setFormData] = useState({
@@ -58,24 +86,47 @@ export default function JobsPage() {
     });
   };
 
-  const handlePostJob = () => {
-    const newJob: Job = {
-      id: Date.now().toString(),
-      title: formData.title || "Untitled Position",
-      applicants: 0,
-      matches: 0,
-      views: 0,
-      status: "active",
-      postedAt: "Just now"
-    };
+  const handlePostJob = async () => {
+    try {
+      const payload = {
+        ...formData,
+        company: companyData?.name || "Company",
+        email: companyData?.email || "unknown",
+      };
 
-    setJobs([newJob, ...jobs]);
-    setIsDialogOpen(false);
-    setFormData({ title: "", salary: "", description: "" });
+      const res = await fetch("/api/company/job/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-    toast.success("Job Posted Successfully", {
-      description: "You can now start matching with candidates."
-    });
+      const data = await res.json();
+
+      if (data.success && data.data) {
+        const newJob: Job = {
+          id: data.data._id,
+          title: data.data.title,
+          applicants: 0,
+          matches: 0,
+          views: 0,
+          status: "active",
+          postedAt: "Just now"
+        };
+
+        setJobs([newJob, ...jobs]);
+        setIsDialogOpen(false);
+        setFormData({ title: "", salary: "", description: "" });
+
+        toast.success("Job Posted Successfully", {
+          description: "You can now start matching with candidates."
+        });
+      } else {
+        toast.error("Failed to post job");
+      }
+    } catch (error) {
+      console.error("Post job error:", error);
+      toast.error("Network error");
+    }
   };
 
   const toggleStatus = (id: string) => {
