@@ -16,7 +16,7 @@ export async function PUT(req: NextRequest) {
     }
 
     // Re-generate Embedding if description changes (optional, but good for accuracy)
-    let embedding = undefined;
+    let embedding: number[] | undefined;
     if (description) {
       try {
         const textToEmbed = `Job Title: ${title}. Company: ${company}. Description: ${description}. Requirements: ${description}`;
@@ -26,7 +26,7 @@ export async function PUT(req: NextRequest) {
       }
     }
 
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       title,
       company,
       description,
@@ -49,12 +49,12 @@ export async function PUT(req: NextRequest) {
 
     return NextResponse.json({ success: true, data: updatedJob });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Update Job Error:", error);
+    const message = error instanceof Error ? error.message : "Internal Server Error";
     return NextResponse.json(
-      { error: error.message || "Internal Server Error" },
+      { error: message },
       { status: 500 }
     );
   }
 }
-

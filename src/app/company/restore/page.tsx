@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, RefreshCw } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -109,7 +110,7 @@ export default function RestorePage() {
             Rejected Matches
           </CardTitle>
           <CardDescription>
-            Here are all candidates you've rejected (soft deleted). You can choose to restore them back to the interested list.
+            Here are all candidates you&rsquo;ve rejected (soft deleted). You can choose to restore them back to the interested list.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -130,9 +131,11 @@ export default function RestorePage() {
                 className="flex items-center justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors"
               >
                 <div className="flex items-center gap-4">
-                  <img
+                  <Image
                     src={match.candidate.avatar || "https://github.com/shadcn.png"}
                     alt={match.candidate.name}
+                    width={48}
+                    height={48}
                     className="w-12 h-12 rounded-full"
                   />
                   <div>

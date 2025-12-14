@@ -16,6 +16,8 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+type IdLike = string | number | { toString(): string } | null | undefined;
+
 type MatchRecord = {
   _id?: string;
   status: MatchStatus;
@@ -37,7 +39,7 @@ type MatchRecord = {
 };
 
 type InterviewRecord = MatchRecord & {
-  candidate?: any;
+  candidate?: Record<string, unknown> | null;
 };
 
 interface OfferCard {
@@ -64,7 +66,7 @@ interface InterviewCard {
   status: MatchStatus;
 }
 
-const toStringId = (value: any) => {
+const toStringId = (value: IdLike) => {
   if (!value) return "";
   if (typeof value === "string") return value;
   if (typeof value === "number") return String(value);
@@ -144,10 +146,11 @@ export default function ApplicationsPage() {
 
         setOffers(nextOffers);
         setPendingApps(nextPending);
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Load applications error:", error);
+        const message = error instanceof Error ? error.message : "Failed to load application list";
         toast.error("Failed to load application list", {
-          description: (error as Error).message,
+          description: message,
         });
       } finally {
         setLoading(false);
@@ -165,8 +168,9 @@ export default function ApplicationsPage() {
 
         const nextInterviews: InterviewCard[] = (data.data || []).map((item: InterviewRecord) => {
           const job = getJobInfo(item);
+          const matchId = toStringId(item._id || crypto.randomUUID());
           return {
-            id: toStringId((item as any)._id || crypto.randomUUID()),
+            id: matchId,
             company: job.company || "Hiring Company",
             role: job.title || "Open Role",
             time: item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "To be scheduled",
@@ -176,10 +180,11 @@ export default function ApplicationsPage() {
         });
 
         setInterviews(nextInterviews);
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Load interviews error:", error);
+        const message = error instanceof Error ? error.message : "Failed to load interview data";
         toast.error("Failed to load interview data", {
-          description: (error as Error).message,
+          description: message,
         });
       } finally {
         setInterviewLoading(false);

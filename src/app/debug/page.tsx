@@ -40,7 +40,7 @@ export default function DebugPage() {
       } else {
         toast.error("Error", { description: data.error });
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to seed data");
     } finally {
       setSeeding(false);
@@ -69,7 +69,7 @@ export default function DebugPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats?.jobs ?? '-'}</div>
-            <p className="text-xs text-muted-foreground">in MongoDB collection 'jobs'</p>
+            <p className="text-xs text-muted-foreground">in MongoDB collection &apos;jobs&apos;</p>
           </CardContent>
         </Card>
         <Card>
@@ -79,7 +79,7 @@ export default function DebugPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats?.candidates ?? '-'}</div>
-            <p className="text-xs text-muted-foreground">in MongoDB collection 'candidates'</p>
+            <p className="text-xs text-muted-foreground">in MongoDB collection &apos;candidates&apos;</p>
           </CardContent>
         </Card>
       </div>
@@ -105,6 +105,4 @@ export default function DebugPage() {
     </div>
   );
 }
-
-
 

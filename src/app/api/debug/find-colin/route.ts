@@ -1,8 +1,8 @@
 import { Candidate } from "@/lib/db/models";
 import dbConnect from "@/lib/db/mongodb";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     await dbConnect();
     // 模糊搜索 Colin
@@ -24,8 +24,8 @@ export async function GET(req: NextRequest) {
         email: c.email
       }))
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-

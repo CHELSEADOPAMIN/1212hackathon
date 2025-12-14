@@ -44,13 +44,17 @@ interface UserProfile {
   experiences?: Experience[];
 }
 
-const normalizeSkills = (skills: any): SkillPoint[] => {
+type SkillInput = Partial<SkillPoint> & { name?: string; category?: string; level?: number; score?: number };
+type ExperienceInput = Partial<Experience> & { _id?: string; title?: string; organization?: string; duration?: string; details?: string };
+
+const normalizeSkills = (skills: unknown): SkillPoint[] => {
   if (!Array.isArray(skills) || skills.length === 0) return DEFAULT_SKILLS;
 
   const clampedSkills = skills
-    .map((skill: any, index: number) => {
-      const subject = skill.subject || skill.name || skill.category || `Skill ${index + 1}`;
-      const rawLevel = skill.A ?? skill.level ?? skill.score ?? 0;
+    .map((skill, index: number) => {
+      const typedSkill = skill as SkillInput;
+      const subject = typedSkill.subject || typedSkill.name || typedSkill.category || `Skill ${index + 1}`;
+      const rawLevel = typedSkill.A ?? typedSkill.level ?? typedSkill.score ?? 0;
       const level = Number.isFinite(rawLevel) ? rawLevel : 0;
       const boundedLevel = Math.max(0, Math.min(100, level));
 
@@ -63,16 +67,19 @@ const normalizeSkills = (skills: any): SkillPoint[] => {
   return clampedSkills.length > 0 ? clampedSkills : DEFAULT_SKILLS;
 };
 
-const normalizeExperiences = (experiences: any): Experience[] => {
+const normalizeExperiences = (experiences: unknown): Experience[] => {
   if (!Array.isArray(experiences)) return [];
 
-  return experiences.map((exp: any, index: number) => ({
-    id: exp.id || exp._id || `exp-${index}`,
-    role: exp.role || exp.title || "Role",
-    company: exp.company || exp.organization || "Company",
-    period: exp.period || exp.duration || "",
-    description: exp.description || exp.details || "",
-  }));
+  return experiences.map((exp, index: number) => {
+    const typedExp = exp as ExperienceInput;
+    return {
+      id: typedExp.id || typedExp._id || `exp-${index}`,
+      role: typedExp.role || typedExp.title || "Role",
+      company: typedExp.company || typedExp.organization || "Company",
+      period: typedExp.period || typedExp.duration || "",
+      description: typedExp.description || typedExp.details || "",
+    };
+  });
 };
 
 const wrapPolarLabel = (value: string, maxPerLine = 18): string[] => {
@@ -93,14 +100,22 @@ const wrapPolarLabel = (value: string, maxPerLine = 18): string[] => {
   return lines;
 };
 
-const renderAngleTick = ({ payload, x, y }: any) => {
+type AngleTickProps = {
+  payload?: { value?: string | number };
+  x?: number | string;
+  y?: number | string;
+};
+
+const renderAngleTick = ({ payload, x, y }: AngleTickProps) => {
   const value = payload?.value ? String(payload.value) : "";
   const lines = wrapPolarLabel(value);
+  const xPos = typeof x === "number" ? x : Number(x ?? 0);
+  const yPos = typeof y === "number" ? y : Number(y ?? 0);
 
   return (
-    <text x={x} y={y} textAnchor="middle" fill="#475569" fontSize={12}>
+    <text x={xPos} y={yPos} textAnchor="middle" fill="#475569" fontSize={12}>
       {lines.map((line, index) => (
-        <tspan key={index} x={x} dy={index === 0 ? 0 : 14}>
+        <tspan key={index} x={xPos} dy={index === 0 ? 0 : 14}>
           {line}
         </tspan>
       ))}
@@ -128,6 +143,7 @@ export default function MyProfilePage() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
@@ -136,6 +152,7 @@ export default function MyProfilePage() {
 
   // Read data generated from Onboarding
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     const savedProfile = localStorage.getItem('userProfile');
     if (savedProfile) {
       try {
@@ -159,6 +176,7 @@ export default function MyProfilePage() {
         console.error("Failed to load profile", e);
       }
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
   // Edit/add form state

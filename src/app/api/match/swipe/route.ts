@@ -42,8 +42,9 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, data: serializeMatch(match) });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Match swipe error:", error);
-    return NextResponse.json({ success: false, error: error.message || "Server error" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Server error";
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

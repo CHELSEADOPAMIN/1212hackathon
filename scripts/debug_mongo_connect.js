@@ -1,6 +1,6 @@
-const mongoose = require('mongoose');
-const fs = require('fs');
-const path = require('path');
+import mongoose from "mongoose";
+import fs from "fs";
+import path from "path";
 
 // Try to read .env.local manually since we can't rely on dotenv in this environment
 let uri = process.env.MONGODB_URI;

@@ -424,7 +424,7 @@ export default function OnboardingPage() {
                 <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100">
                   <h4 className="font-semibold text-emerald-900 mb-2">Match Reason</h4>
                   <p className="text-emerald-700 font-medium italic">
-                    "{result.matchReason}"
+                    &ldquo;{result.matchReason}&rdquo;
                   </p>
                 </div>
               </div>

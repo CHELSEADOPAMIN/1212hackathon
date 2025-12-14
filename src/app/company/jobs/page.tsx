@@ -34,6 +34,14 @@ interface Job {
   postedAt: string;
 }
 
+interface ApiJob {
+  _id: string;
+  title: string;
+  description?: string;
+  salary?: string;
+  postedAt: string;
+}
+
 export default function JobsPage() {
   const router = useRouter();
   const { companyData } = useCompany();
@@ -57,7 +65,7 @@ export default function JobsPage() {
         const data = await res.json();
 
         if (data.success && Array.isArray(data.data)) {
-          const formattedJobs = data.data.map((j: any) => ({
+          const formattedJobs = data.data.map((j: ApiJob) => ({
             id: j._id,
             title: j.title,
             description: j.description,
@@ -104,7 +112,7 @@ export default function JobsPage() {
     }
 
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         ...formData,
         company: companyData?.name || "Company",
         email: companyData?.email || "unknown",
@@ -117,7 +125,7 @@ export default function JobsPage() {
       if (editingId) {
         url = "/api/company/job/update";
         method = "PUT";
-        (payload as any).id = editingId;
+        payload.id = editingId;
       }
 
       const res = await fetch(url, {
@@ -267,6 +275,10 @@ export default function JobsPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {loading && (
+        <div className="text-sm text-muted-foreground">Loading jobs...</div>
+      )}
 
       {/* Jobs Grid */}
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">

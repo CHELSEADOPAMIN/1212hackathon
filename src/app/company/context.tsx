@@ -59,6 +59,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem('companyProfile');
     if (saved) {
       try {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setCompanyData(JSON.parse(saved));
       } catch (e) {
         console.error("Failed to parse company profile", e);

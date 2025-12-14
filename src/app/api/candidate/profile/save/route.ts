@@ -8,6 +8,25 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+interface SkillInput {
+  subject?: string;
+  name?: string;
+  level?: number;
+  A?: number;
+  category?: string;
+}
+
+interface CandidateProfileRequest {
+  name: string;
+  role: string;
+  skills: SkillInput[];
+  summary?: string;
+  experiences?: unknown[];
+  email: string;
+  githubUrl?: string;
+  matchReason?: string;
+}
+
 async function getEmbedding(text: string) {
   try {
     const response = await openai.embeddings.create({
@@ -27,10 +46,12 @@ async function getEmbedding(text: string) {
 export async function POST(req: NextRequest) {
   try {
     await dbConnect();
-    const body = await req.json();
+    const body = (await req.json()) as Partial<CandidateProfileRequest>;
+    const skills = Array.isArray(body.skills) ? body.skills : [];
+    const experiences = Array.isArray(body.experiences) ? body.experiences : [];
 
     // Validate required fields
-    if (!body.name || !body.role || !body.skills || !body.email) {
+    if (!body.name || !body.role || skills.length === 0 || !body.email) {
       return NextResponse.json(
         { error: "Missing required fields (name, role, skills, email)" },
         { status: 400 }
@@ -39,11 +60,9 @@ export async function POST(req: NextRequest) {
 
     // Generate embedding for vector search
     // Combine role, summary, and skills into a rich text representation
-    const skillText = Array.isArray(body.skills)
-      ? body.skills
-        .map((s: any) => `${s.subject || s.name} (${s.level ?? "n/a"})`)
-        .join(", ")
-      : "";
+    const skillText = skills
+      .map((s) => `${s.subject || s.name} (${s.level ?? "n/a"})`)
+      .join(", ");
 
     const embedParts = [`Role: ${body.role}`];
     if (body.summary) {
@@ -56,14 +75,15 @@ export async function POST(req: NextRequest) {
 
     console.log("-> Generating embedding for candidate:", body.email);
 
-    let embedding;
+    let embedding: number[];
     try {
       embedding = await getEmbedding(textToEmbed);
       console.log("-> Embedding generated successfully, length:", embedding?.length);
-    } catch (e: any) {
-      console.error("-> OpenAI Embedding Failed:", e.message);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Unknown error";
+      console.error("-> OpenAI Embedding Failed:", message);
       return NextResponse.json(
-        { error: `OpenAI Embedding Failed: ${e.message}` },
+        { error: `OpenAI Embedding Failed: ${message}` },
         { status: 500 }
       );
     }
@@ -76,12 +96,12 @@ export async function POST(req: NextRequest) {
       summary: body.summary,
       // Map skills from UI format (subject, A) to Schema format (name, level)
       // handling both potential input formats for robustness
-      skills: body.skills.map((s: any) => ({
+      skills: skills.map((s) => ({
         name: s.subject || s.name,
         level: s.A || s.level,
         category: s.category || 'General'
       })),
-      experiences: body.experiences || [],
+      experiences,
       email: body.email,
       githubUrl: body.githubUrl,
       matchReason: body.matchReason,
@@ -99,10 +119,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, data: savedCandidate });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("-> Save Profile Error (Catch Block):", error);
+    const message = error instanceof Error ? error.message : "Internal Server Error";
     return NextResponse.json(
-      { error: `Internal Server Error: ${error.message}` },
+      { error: `Internal Server Error: ${message}` },
       { status: 500 }
     );
   }
