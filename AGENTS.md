@@ -137,6 +137,11 @@ Required for AI features:
 - Vector database planned for semantic matching (MongoDB Atlas Vector Search)
 - Authentication not yet implemented (GitHub/Google OAuth planned)
 
+### MongoDB Driver Usage
+- **Do NOT mix `mongoose` and native `mongodb` driver logic unnecessarily.**
+- For RAG/Vector Search features (especially aggregation pipelines), **ALWAYS use the native `mongodb` driver** as implemented in `src/lib/matching.ts`.
+- Mongoose is currently installed but should be reserved for standard CRUD operations if needed in the future, or avoided to keep the stack simple.
+
 ### Onboarding Flow State Machine
 The [candidate onboarding](src/app/candidate/onboarding/page.tsx) uses a 4-step state machine:
 1. GitHub URL input

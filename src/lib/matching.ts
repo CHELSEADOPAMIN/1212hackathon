@@ -7,8 +7,8 @@ import {
   JobProfileInput,
 } from "@/lib/types";
 
-const JOBS_VECTOR_INDEX = process.env.MONGODB_JOBS_INDEX || "default";
-const CANDIDATES_VECTOR_INDEX = process.env.MONGODB_CANDIDATES_INDEX || "default";
+const JOBS_VECTOR_INDEX = process.env.MONGODB_JOBS_INDEX || "vector_index";
+const CANDIDATES_VECTOR_INDEX = process.env.MONGODB_CANDIDATES_INDEX || "vector_index";
 const NUM_CANDIDATES =
   Number(process.env.MONGODB_VECTOR_CANDIDATES ?? 100) || 100;
 const LIMIT = Number(process.env.MONGODB_VECTOR_LIMIT ?? 10) || 10;
