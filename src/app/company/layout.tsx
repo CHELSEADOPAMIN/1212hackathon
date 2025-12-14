@@ -1,9 +1,9 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import { Briefcase, Kanban, LogOut, Radar, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, Radar, Kanban, LogOut, TrendingUp } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { CompanyProvider } from "./context";
 
 const sidebarItems = [
@@ -30,6 +30,17 @@ export default function CompanyLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const isOnboarding = pathname?.startsWith('/company/onboarding');
+
+  if (isOnboarding) {
+    return (
+      <CompanyProvider>
+        <div className="min-h-screen bg-slate-950">
+          {children}
+        </div>
+      </CompanyProvider>
+    );
+  }
 
   return (
     <CompanyProvider>
@@ -52,11 +63,10 @@ export default function CompanyLayout({
               return (
                 <Link key={item.href} href={item.href}>
                   <div
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                      isActive
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${isActive
                         ? "bg-emerald-600 text-white"
                         : "text-slate-400 hover:bg-slate-800 hover:text-white"
-                    }`}
+                      }`}
                   >
                     <Icon className={`w-5 h-5 ${isActive ? "text-white" : "text-slate-400"}`} />
                     {item.title}
