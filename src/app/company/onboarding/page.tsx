@@ -105,7 +105,7 @@ export default function CompanyAuthPage() {
         <CardHeader>
           <CardTitle className="text-2xl flex items-center gap-2 text-emerald-400">
             <Building2 className="w-6 h-6" />
-            Lyrathon for Business
+            GeekHunter for Business
           </CardTitle>
           <CardDescription className="text-slate-400">
             {step === 0 ? "Sign in or create an account to start hiring." : "Tell us about your company."}

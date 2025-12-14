@@ -15,7 +15,7 @@ export default function LandingPage() {
           </div>
 
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-foreground">
-            Lyrathon For Talent
+            GeekHunter For Talent
           </h1>
 
           <p className="text-lg text-muted-foreground">
@@ -48,7 +48,7 @@ export default function LandingPage() {
           </div>
 
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-foreground">
-            Lyrathon For Hiring
+            GeekHunter For Hiring
           </h1>
 
           <p className="text-lg text-muted-foreground">
