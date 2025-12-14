@@ -49,9 +49,9 @@ interface PipelineMatchResponse {
 }
 
 const DEFAULT_INTERVIEW_QUESTIONS = [
-  "请简单介绍一下你最近主导的一个项目，以及最大的技术亮点是什么？",
-  "遇到过最棘手的技术难题是什么？你是如何拆解并解决的？",
-  "你希望加入的团队文化是什么样的？",
+  "Please describe a recent project you led and its most noteworthy technical achievement.",
+  "What was the toughest technical problem you faced, and how did you break it down?",
+  "What kind of team culture do you thrive in?",
 ];
 
 export default function ProcessTrackerPage() {
@@ -248,7 +248,7 @@ export default function ProcessTrackerPage() {
 
     const payloadQuestions = questionList.map((q) => q.trim()).filter(Boolean);
     if (payloadQuestions.length === 0) {
-      toast.error("请至少填写一个面试问题");
+      toast.error("Please provide at least one interview question.");
       return;
     }
 
@@ -263,7 +263,7 @@ export default function ProcessTrackerPage() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Failed to schedule interview");
       }
-      toast.success("Interview scheduled", { description: "候选人已收到 AI 面试邀请链接" });
+      toast.success("Interview scheduled", { description: "Candidate has received the AI interview link." });
       setInterviewDialogOpen(false);
       resetInterviewDialog();
       await loadPipeline();
@@ -422,7 +422,7 @@ export default function ProcessTrackerPage() {
                       )}
                       {item.status === "interview_pending" && (
                         <div className="rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-700 px-3 py-2 text-sm">
-                          AI 面试邀请已发送，等待候选人完成。
+                          AI interview invite sent; waiting for the candidate to start.
                         </div>
                       )}
                     </CardContent>
@@ -621,7 +621,7 @@ export default function ProcessTrackerPage() {
           <DialogHeader>
             <DialogTitle>Setup AI Interview</DialogTitle>
             <DialogDescription>
-              输入要给候选人的问题，系统会按照顺序朗读。点击保存后，候选人将收到 AI 面试链接。
+              Enter the questions for the candidate; the system will read them in order. After saving, the candidate will receive the AI interview link.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
@@ -632,7 +632,7 @@ export default function ProcessTrackerPage() {
                   <Input
                     value={question}
                     onChange={(e) => handleQuestionChange(index, e.target.value)}
-                    placeholder="请输入面试问题"
+                    placeholder="Type your interview question"
                     className="border-slate-200"
                   />
                 </div>
@@ -654,18 +654,18 @@ export default function ProcessTrackerPage() {
               className="w-full border-dashed border-slate-200 text-slate-600 hover:bg-slate-50"
             >
               <Plus className="w-4 h-4 mr-2" />
-              添加问题
+              Add question
             </Button>
           </div>
           <DialogFooter className="gap-2">
             <DialogClose asChild>
               <Button type="button" variant="ghost" onClick={resetInterviewDialog} disabled={isScheduling}>
-                取消
+                Cancel
               </Button>
             </DialogClose>
             <Button type="button" onClick={handleSubmitInterview} disabled={isScheduling}>
               {isScheduling && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              保存并发送
+              Save & Send
             </Button>
           </DialogFooter>
         </DialogContent>

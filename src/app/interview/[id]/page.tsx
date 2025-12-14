@@ -25,7 +25,7 @@ type InterviewDetail = {
   } | null;
 };
 
-const FINAL_QUESTION = "有什么想问我们的吗？";
+const FINAL_QUESTION = "Do you have any questions for us?";
 
 export default function InterviewRoomPage() {
   const params = useParams<{ id: string }>();
@@ -59,7 +59,7 @@ export default function InterviewRoomPage() {
 
   const startRecorder = (stream: MediaStream) => {
     if (typeof window === "undefined" || typeof MediaRecorder === "undefined") {
-      setError("浏览器不支持录制功能");
+      setError("Recording is not supported by your browser.");
       return;
     }
     const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
@@ -102,7 +102,7 @@ export default function InterviewRoomPage() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "无法生成语音");
+      throw new Error(data.error || "Unable to generate speech");
       }
       const contentType = res.headers.get("Content-Type") || "audio/mpeg";
       const arrayBuffer = await res.arrayBuffer();
@@ -134,7 +134,7 @@ export default function InterviewRoomPage() {
       setIsSubmitting(true);
       const blob = await stopRecording();
       if (!blob || blob.size === 0) {
-        throw new Error("未获取到录像，请确认摄像头和麦克风权限。");
+        throw new Error("No recording captured; please check camera and microphone permissions.");
       }
       const formData = new FormData();
       formData.append("interviewId", interviewId);
@@ -146,14 +146,14 @@ export default function InterviewRoomPage() {
       });
       const data = await res.json();
       if (!res.ok || data?.success === false) {
-        throw new Error(data.error || "上传失败");
+        throw new Error(data.error || "Upload failed");
       }
-      toast.success("面试已提交", { description: "录像已上传给 HR" });
+      toast.success("Interview submitted", { description: "Recording uploaded for HR review." });
       router.push("/candidate/dashboard/applications");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "提交失败";
+      const message = err instanceof Error ? err.message : "Submission failed.";
       setError(message);
-      toast.error("提交失败", { description: message });
+      toast.error("Submission failed", { description: message });
     } finally {
       setIsSubmitting(false);
     }
@@ -183,17 +183,17 @@ export default function InterviewRoomPage() {
         const res = await fetch(`/api/interview/upcoming?interviewId=${interviewId}`);
         const data = await res.json();
         if (!res.ok || data?.success === false) {
-          throw new Error(data.error || "无法获取面试信息");
+          throw new Error(data.error || "Unable to fetch interview details");
         }
         const payload = data.data as InterviewDetail;
         if (!payload?.questions?.length) {
-          throw new Error("面试题目未准备好，请稍后重试。");
+          throw new Error("Interview questions are not ready yet. Please try again later.");
         }
         setInterview(payload);
       } catch (err) {
-        const message = err instanceof Error ? err.message : "加载面试信息失败";
+        const message = err instanceof Error ? err.message : "Failed to load interview info";
         setError(message);
-        toast.error("加载失败", { description: message });
+        toast.error("Load failed", { description: message });
       } finally {
         setLoading(false);
       }
@@ -213,9 +213,9 @@ export default function InterviewRoomPage() {
         }
         startRecorder(stream);
       } catch (err) {
-        const message = err instanceof Error ? err.message : "无法访问摄像头或麦克风";
+        const message = err instanceof Error ? err.message : "Unable to access camera or microphone";
         setError(message);
-        toast.error("设备权限不足", { description: message });
+        toast.error("Device access denied", { description: message });
       }
     };
 
@@ -236,7 +236,7 @@ export default function InterviewRoomPage() {
   useEffect(() => {
     if (!interview || !questions.length || hasIntroPlayed || interview.status !== "scheduled") return;
     const company = jobInfo?.company || "Lyrathon";
-    const intro = `你好，欢迎来到 ${company} 的 AI 面试。请保持麦克风和摄像头开启，我们开始吧。`;
+    const intro = `Hello and welcome to ${company}'s AI interview. Please keep your camera and microphone on while we begin.`;
 
     playSpeech(intro)
       .then(() => {
@@ -244,8 +244,8 @@ export default function InterviewRoomPage() {
         setCurrentQuestion(0);
       })
       .catch((err) => {
-        const message = err instanceof Error ? err.message : "语音播报失败";
-        toast.error("语音播报失败", { description: message });
+        const message = err instanceof Error ? err.message : "Speech playback failed";
+        toast.error("Speech playback failed", { description: message });
       });
   }, [interview, questions.length, hasIntroPlayed, jobInfo?.company]);
 
@@ -255,8 +255,8 @@ export default function InterviewRoomPage() {
       try {
         await playSpeech(questions[currentQuestion]);
       } catch (err) {
-        const message = err instanceof Error ? err.message : "语音播报失败";
-        toast.error("语音播报失败", { description: message });
+        const message = err instanceof Error ? err.message : "Speech playback failed";
+        toast.error("Speech playback failed", { description: message });
       }
     };
     speakQuestion();
@@ -265,10 +265,10 @@ export default function InterviewRoomPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 text-white">
-        <div className="flex items-center gap-3 text-lg">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          正在加载面试房间...
-        </div>
+          <div className="flex items-center gap-3 text-lg">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            Loading interview room...
+          </div>
       </div>
     );
   }
@@ -277,10 +277,10 @@ export default function InterviewRoomPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-white gap-4 px-6 text-center">
         <Sparkles className="w-10 h-10 text-amber-400" />
-        <p className="text-lg font-semibold">面试暂时不可用</p>
-        <p className="text-slate-400 max-w-lg">{error || "未找到面试信息，请稍后再试。"}</p>
+        <p className="text-lg font-semibold">Interview currently unavailable</p>
+        <p className="text-slate-400 max-w-lg">{error || "Interview information not found. Please try again later."}</p>
         <Button onClick={() => router.push("/candidate/dashboard/applications")} className="bg-blue-600 hover:bg-blue-700">
-          返回 Dashboard
+          Back to Dashboard
         </Button>
       </div>
     );
@@ -288,7 +288,7 @@ export default function InterviewRoomPage() {
 
   const isLastQuestion = currentQuestion >= questions.length - 1;
   const questionText =
-    currentQuestion >= 0 && questions[currentQuestion] ? questions[currentQuestion] : "请稍候，准备下一题...";
+    currentQuestion >= 0 && questions[currentQuestion] ? questions[currentQuestion] : "Please wait while we load the next question...";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 text-white">
@@ -306,7 +306,7 @@ export default function InterviewRoomPage() {
           {isRecording && (
             <Badge className="bg-emerald-500 text-emerald-50 border-0">
               <span className="w-2 h-2 rounded-full bg-white inline-block mr-2 animate-ping" />
-              录制中
+              Recording
             </Badge>
           )}
           <Button
@@ -315,7 +315,7 @@ export default function InterviewRoomPage() {
             onClick={handleExit}
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            退出
+            Exit
           </Button>
         </div>
       </div>
@@ -325,12 +325,12 @@ export default function InterviewRoomPage() {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-xl">
               <Sparkles className="w-5 h-5 text-amber-400" />
-              AI 面试官
-            </CardTitle>
-            <Badge variant="outline" className="border-white/20 text-white">
-              {currentQuestion >= 0 ? `问题 ${currentQuestion + 1}/${questions.length}` : "正在准备"}
-            </Badge>
-          </CardHeader>
+                  AI Interviewer
+                </CardTitle>
+              <Badge variant="outline" className="border-white/20 text-white">
+                {currentQuestion >= 0 ? `Question ${currentQuestion + 1}/${questions.length}` : "Preparing"}
+              </Badge>
+            </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center gap-4">
               <div className="relative h-24 w-24">
@@ -341,9 +341,9 @@ export default function InterviewRoomPage() {
                 </div>
               </div>
               <div className="flex-1">
-                <p className="text-sm text-slate-300">AI 正在朗读问题，请在回答完毕后点击「下一题」</p>
+                <p className="text-sm text-slate-300">AI is reading the question. Click 'Next' after answering.</p>
                 <p className="text-xs text-slate-400 mt-1">
-                  {isSpeaking || isLoadingAudio ? "语音播放中..." : "准备好后即可开始作答"}
+                  {isSpeaking || isLoadingAudio ? "Playing audio..." : "Ready when you are"}
                 </p>
               </div>
             </div>
@@ -360,27 +360,27 @@ export default function InterviewRoomPage() {
               onClick={handleNext}
               className="w-full bg-emerald-500 hover:bg-emerald-600 text-white"
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  正在提交...
-                </>
-              ) : (
-                <>
-                  {isLastQuestion ? "提交并结束" : "下一题"}
-                  <ChevronRight className="w-4 h-4 ml-2" />
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      {isLastQuestion ? "Submit & Finish" : "Next Question"}
+                      <ChevronRight className="w-4 h-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
 
         <Card className="bg-white/5 border-white/10 text-white shadow-2xl shadow-emerald-500/10">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Video className="w-5 h-5 text-emerald-400" />
-              我的画面
-            </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Video className="w-5 h-5 text-emerald-400" />
+            Your Camera
+          </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-2xl overflow-hidden border border-white/10 bg-black/60">
@@ -388,21 +388,21 @@ export default function InterviewRoomPage() {
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm text-slate-200">
               <div className="rounded-xl bg-white/10 border border-white/10 p-3">
-                <p className="text-xs text-slate-400">状态</p>
+                <p className="text-xs text-slate-400">Status</p>
                 <p className="font-semibold">
-                  {interview.status === "scheduled" ? "录制中" : "已提交"}
+                  {interview.status === "scheduled" ? "Recording" : "Submitted"}
                 </p>
               </div>
               <div className="rounded-xl bg-white/10 border border-white/10 p-3">
-                <p className="text-xs text-slate-400">问题数</p>
+                <p className="text-xs text-slate-400">Questions</p>
                 <p className="font-semibold">{questions.length}</p>
               </div>
               <div className="rounded-xl bg-white/10 border border-white/10 p-3">
-                <p className="text-xs text-slate-400">职位</p>
+                <p className="text-xs text-slate-400">Role</p>
                 <p className="font-semibold">{jobInfo.title || "AI Interview"}</p>
               </div>
               <div className="rounded-xl bg-white/10 border border-white/10 p-3">
-                <p className="text-xs text-slate-400">公司</p>
+                <p className="text-xs text-slate-400">Company</p>
                 <p className="font-semibold">{jobInfo.company || "Lyrathon"}</p>
               </div>
             </div>

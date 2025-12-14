@@ -232,8 +232,8 @@ export default function ApplicationsPage() {
     if (interview.status !== "scheduled") {
       toast.info("Interview not available", {
         description: interview.recordingUrl
-          ? "面试录像已提交，HR 正在审核。"
-          : "请等待 HR 完成面试准备。",
+          ? "Interview recording submitted; HR is reviewing it."
+          : "Please wait for HR to prepare the interview.",
       });
       return;
     }
