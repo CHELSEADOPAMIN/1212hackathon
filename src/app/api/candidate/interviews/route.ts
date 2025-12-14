@@ -2,7 +2,7 @@ import { getMatchesCollection, hydrateMatchRecords, serializeMatch } from "@/lib
 import { MatchStatus } from "@/lib/types";
 import { NextRequest, NextResponse } from "next/server";
 
-const INTERVIEW_STATUSES: MatchStatus[] = ["matched", "interview_pending"];
+const INTERVIEW_STATUSES: MatchStatus[] = ["matched", "interview_pending", "interview_completed"];
 
 export async function GET(req: NextRequest) {
   try {

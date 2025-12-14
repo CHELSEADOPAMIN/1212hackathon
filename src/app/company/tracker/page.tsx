@@ -8,6 +8,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import type { MatchStatus } from "@/lib/types";
 import {
   AlertCircle, BrainCircuit,
@@ -15,8 +16,6 @@ import {
   DollarSign,
   Info,
   Loader2,
-  Pause,
-  Play,
   Plus,
   ThumbsDown,
   ThumbsUp,
@@ -24,7 +23,7 @@ import {
   Trash2,
   X
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Candidate, useCompany } from "../context";
 
@@ -46,7 +45,46 @@ interface PipelineMatchResponse {
   candidateSnapshot?: PipelineMatchResponse["candidate"];
   job?: { title?: string; location?: string };
   jobSnapshot?: { title?: string; location?: string };
+  offer?: { amount?: number; currency?: string; message?: string; createdAt?: string };
+  marketOffer?: number;
+  offerCount?: number;
+  averageCompetitorOffer?: number;
+  interview?: {
+    _id?: string;
+    matchId?: string;
+    recordingUrl?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  };
 }
+
+type PipelineCard = {
+  id: string;
+  status: MatchStatus;
+  candidate: Candidate;
+  jobTitle?: string;
+  jobLocation?: string;
+  matchScore?: number;
+};
+
+type InterviewReview = Candidate & {
+  matchId: string;
+  jobTitle?: string;
+  jobLocation?: string;
+  recordingUrl?: string;
+  status: MatchStatus;
+};
+
+type OfferEntry = Candidate & {
+  matchId: string;
+  status: MatchStatus;
+  currency?: string;
+  offerMessage?: string;
+  offerCount?: number;
+  averageCompetitorOffer?: number;
+  jobTitle?: string;
+  jobLocation?: string;
+};
 
 const DEFAULT_INTERVIEW_QUESTIONS = [
   "Please describe a recent project you led and its most noteworthy technical achievement.",
@@ -55,27 +93,19 @@ const DEFAULT_INTERVIEW_QUESTIONS = [
 ];
 
 export default function ProcessTrackerPage() {
-  const {
-    companyData,
-    interviews, offers,
-    moveToOffer, updateOffer
-  } = useCompany();
-  const [pipeline, setPipeline] = useState<Array<{
-    id: string;
-    status: MatchStatus;
-    candidate: Candidate;
-    jobTitle?: string;
-    jobLocation?: string;
-    matchScore?: number;
-  }>>([]);
+  const { companyData } = useCompany();
+  const [pipeline, setPipeline] = useState<PipelineCard[]>([]);
+  const [interviewReviews, setInterviewReviews] = useState<InterviewReview[]>([]);
+  const [offerEntries, setOfferEntries] = useState<OfferEntry[]>([]);
   const [loadingPipeline, setLoadingPipeline] = useState(true);
   const [pendingRejects, setPendingRejects] = useState<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  // Video playback status mock
-  const [isPlaying, setIsPlaying] = useState(false);
-
   // Bidding input status
-  const [offerInput, setOfferInput] = useState<string>("");
+  const [offerDrafts, setOfferDrafts] = useState<Record<string, string>>({});
+  const [offerDialogOpen, setOfferDialogOpen] = useState(false);
+  const [activeOfferMatchId, setActiveOfferMatchId] = useState<string | null>(null);
+  const [offerForm, setOfferForm] = useState({ amount: "", message: "" });
+  const [isSubmittingOffer, setIsSubmittingOffer] = useState(false);
 
   // Interview setup dialog state
   const [interviewDialogOpen, setInterviewDialogOpen] = useState(false);
@@ -93,15 +123,17 @@ export default function ProcessTrackerPage() {
   );
 
   const loadPipeline = useCallback(async () => {
-    try {
-      setLoadingPipeline(true);
-      const companyId = companyData?._id;
-      if (!companyId) {
-        setPipeline([]);
-        toast.error("Please log in to your company account first");
-        setLoadingPipeline(false);
-        return;
-      }
+      try {
+        setLoadingPipeline(true);
+        const companyId = companyData?._id;
+        if (!companyId) {
+          setPipeline([]);
+          setInterviewReviews([]);
+          setOfferEntries([]);
+          toast.error("Please log in to your company account first");
+          setLoadingPipeline(false);
+          return;
+        }
 
       const res = await fetch(`/api/company/pipeline?companyId=${companyId}`);
       const data = await res.json();
@@ -111,7 +143,11 @@ export default function ProcessTrackerPage() {
       }
 
       const apiMatches: PipelineMatchResponse[] = data.data || [];
-      const formatted = apiMatches.map((item) => {
+      const nextPipeline: PipelineCard[] = [];
+      const nextInterviews: InterviewReview[] = [];
+      const nextOffers: OfferEntry[] = [];
+
+      apiMatches.forEach((item) => {
         const candidateData = item.candidate || item.candidateSnapshot || {};
         const candidate: Candidate = {
           id: candidateData._id || candidateData.id || (crypto.randomUUID?.() ?? Date.now().toString()),
@@ -122,17 +158,55 @@ export default function ProcessTrackerPage() {
           summary: candidateData.summary || "",
         };
 
-        return {
-          id: item._id || crypto.randomUUID?.() || Date.now().toString(),
-          status: item.status as MatchStatus,
-          candidate,
-          jobTitle: item.job?.title || item.jobSnapshot?.title || "Open Role",
-          jobLocation: item.job?.location || item.jobSnapshot?.location || "Remote",
-          matchScore: item.matchScore,
-        };
+        const id = item._id || crypto.randomUUID?.() || Date.now().toString();
+        const status = item.status as MatchStatus;
+        const jobTitle = item.job?.title || item.jobSnapshot?.title || "Open Role";
+        const jobLocation = item.job?.location || item.jobSnapshot?.location || "Remote";
+
+        if (["company_interested", "candidate_interested", "matched", "interview_pending"].includes(status)) {
+          nextPipeline.push({
+            id,
+            status,
+            candidate,
+            jobTitle,
+            jobLocation,
+            matchScore: item.matchScore,
+          });
+        }
+
+        if (status === "interview_completed") {
+          nextInterviews.push({
+            ...candidate,
+            matchId: id,
+            jobTitle,
+            jobLocation,
+            recordingUrl: item.interview?.recordingUrl,
+            status,
+          });
+        }
+
+        if (["offer_pending", "offer_accepted", "offer_rejected"].includes(status)) {
+          const yourOffer = typeof item.offer?.amount === "number" ? item.offer.amount : undefined;
+
+          nextOffers.push({
+            ...candidate,
+            matchId: id,
+            status,
+            yourOffer,
+            currency: item.offer?.currency,
+            offerMessage: item.offer?.message,
+            marketOffer: item.marketOffer ?? 0,
+            offerCount: item.offerCount ?? 0,
+            averageCompetitorOffer: item.averageCompetitorOffer ?? 0,
+            jobTitle,
+            jobLocation,
+          });
+        }
       });
 
-      setPipeline(formatted);
+      setPipeline(nextPipeline);
+      setInterviewReviews(nextInterviews);
+      setOfferEntries(nextOffers);
     } catch (error) {
       console.error("Pipeline fetch error:", error);
       toast.error("Failed to load candidate list");
@@ -150,6 +224,25 @@ export default function ProcessTrackerPage() {
       Object.values(pendingRejects).forEach((timer) => clearTimeout(timer));
     };
   }, [pendingRejects]);
+
+  const offerSummary = useMemo(() => {
+    const count = offerEntries.length;
+    const values = offerEntries
+      .map((entry) => entry.yourOffer)
+      .filter((value): value is number => typeof value === "number" && !Number.isNaN(value));
+    const average =
+      values.length > 0 ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : 0;
+
+    const marketValues = offerEntries
+      .map((entry) => entry.marketOffer ?? 0)
+      .filter((value) => value > 0);
+    const marketAverage =
+      marketValues.length > 0
+        ? Math.round(marketValues.reduce((sum, value) => sum + value, 0) / marketValues.length)
+        : 0;
+
+    return { count, average, marketAverage };
+  }, [offerEntries]);
 
   const updateStatus = async (matchId: string, status: MatchStatus, softDelete = false) => {
     const res = await fetch("/api/match/status", {
@@ -287,21 +380,95 @@ export default function ProcessTrackerPage() {
     }
   };
 
-  const handleMakeOffer = (id: string) => {
-    moveToOffer(id);
-    toast.success("Candidate Moved to Offer Stage", {
-      description: "Prepare your initial offer."
-    });
+  const resetOfferDialog = () => {
+    setOfferDialogOpen(false);
+    setActiveOfferMatchId(null);
+    setOfferForm({ amount: "", message: "" });
+    setIsSubmittingOffer(false);
   };
 
-  const handleUpdateOffer = (id: string) => {
-    const value = parseInt(offerInput.replace(/[^0-9]/g, ''));
-    if (value) {
-      updateOffer(id, value);
-      toast.success("Offer Updated Successfully", {
-        description: `New offer of $${value.toLocaleString()} sent to candidate.`
+  const openOfferDialog = (matchId: string, presetAmount?: number, presetMessage?: string) => {
+    setActiveOfferMatchId(matchId);
+    setOfferForm({
+      amount: presetAmount ? presetAmount.toString() : "",
+      message: presetMessage || "",
+    });
+    setOfferDialogOpen(true);
+  };
+
+  const upsertOffer = async (matchId: string, amount: number, message?: string, currency?: string) => {
+    const res = await fetch("/api/company/offer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ matchId, amount, message, currency }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || "Failed to update offer");
+    }
+  };
+
+  const handleMakeOffer = (matchId: string, presetAmount?: number, presetMessage?: string) => {
+    openOfferDialog(matchId, presetAmount, presetMessage);
+  };
+
+  const submitOffer = async () => {
+    if (!activeOfferMatchId) {
+      toast.error("Missing match id");
+      return;
+    }
+
+    const value = parseInt(offerForm.amount.replace(/[^0-9]/g, ""), 10);
+    if (!value) {
+      toast.error("Please enter a numeric offer.");
+      return;
+    }
+
+    try {
+      setIsSubmittingOffer(true);
+      await upsertOffer(activeOfferMatchId, value, offerForm.message);
+      toast.success("Offer sent", { description: "Candidate has received your updated offer." });
+      resetOfferDialog();
+      await loadPipeline();
+    } catch (error) {
+      console.error("Offer submit error:", error);
+      toast.error("Failed to send offer", { description: (error as Error).message });
+    } finally {
+      setIsSubmittingOffer(false);
+    }
+  };
+
+  const handleUpdateOffer = async (matchId: string) => {
+    const draft = offerDrafts[matchId] ?? "";
+    const value = parseInt(draft.replace(/[^0-9]/g, ""), 10);
+    if (!value) {
+      toast.error("Please enter a numeric offer.");
+      return;
+    }
+
+    const existing = offerEntries.find((item) => item.matchId === matchId);
+
+    try {
+      await upsertOffer(matchId, value, existing?.offerMessage, existing?.currency);
+      toast.success("Offer updated", {
+        description: `New offer of ${value.toLocaleString()} sent to candidate.`,
       });
-      setOfferInput("");
+      setOfferDrafts((prev) => ({ ...prev, [matchId]: "" }));
+      await loadPipeline();
+    } catch (error) {
+      console.error("Update offer error:", error);
+      toast.error("Unable to update offer", { description: (error as Error).message });
+    }
+  };
+
+  const handleRejectAfterInterview = async (matchId: string) => {
+    try {
+      await updateStatus(matchId, "rejected", true);
+      await loadPipeline();
+      toast.success("Candidate rejected");
+    } catch (error) {
+      console.error("Interview rejection error:", error);
+      toast.error("Failed to reject candidate");
     }
   };
 
@@ -315,8 +482,8 @@ export default function ProcessTrackerPage() {
       <Tabs defaultValue="interested" className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-8">
           <TabsTrigger value="interested">Interested ({pipeline.length})</TabsTrigger>
-          <TabsTrigger value="interviews">Interview Review ({interviews.length})</TabsTrigger>
-          <TabsTrigger value="offers">Offer Management ({offers.length})</TabsTrigger>
+          <TabsTrigger value="interviews">Interview Review ({interviewReviews.length})</TabsTrigger>
+          <TabsTrigger value="offers">Offer Management ({offerEntries.length})</TabsTrigger>
         </TabsList>
 
         {/* TAB 1: INTERESTED */}
@@ -435,29 +602,32 @@ export default function ProcessTrackerPage() {
 
         {/* TAB 2: INTERVIEW REVIEW */}
         <TabsContent value="interviews" className="space-y-6">
-          {interviews.map(candidate => (
-            <Card key={candidate.id} className="overflow-hidden">
+          {interviewReviews.map(candidate => (
+            <Card key={candidate.matchId} className="overflow-hidden">
               <div className="grid md:grid-cols-3 h-full">
-                {/* Video Placeholder */}
-                <div className="bg-slate-900 h-[300px] md:h-full flex items-center justify-center relative group cursor-pointer" onClick={() => setIsPlaying(!isPlaying)}>
-                  <div className="absolute inset-0 opacity-50 bg-[url('https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=600&auto=format&fit=crop')] bg-cover bg-center" />
-                  <div className="z-10 bg-white/20 backdrop-blur-sm p-4 rounded-full group-hover:scale-110 transition-transform">
-                    {isPlaying ? <Pause className="w-8 h-8 text-white" /> : <Play className="w-8 h-8 text-white pl-1" />}
-                  </div>
-                  <div className="absolute bottom-4 left-4 text-white z-10">
-                    <p className="font-bold">{candidate.name} - Technical Interview</p>
-                    <p className="text-xs opacity-80">Duration: 45:00</p>
-                  </div>
+                <div className="bg-slate-900 h-[300px] md:h-full relative">
+                  {candidate.recordingUrl ? (
+                    <video
+                      controls
+                      src={candidate.recordingUrl}
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center text-slate-200 text-sm px-6 text-center">
+                      Interview recording unavailable.
+                    </div>
+                  )}
                 </div>
 
-                {/* AI Analysis */}
                 <div className="md:col-span-2 p-6 flex flex-col h-full">
                   <div className="flex justify-between items-start mb-6">
                     <div>
                       <h2 className="text-2xl font-bold">{candidate.name}</h2>
                       <p className="text-slate-500">{candidate.role}</p>
                     </div>
-                    {/* Score removed per request */}
+                    <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-emerald-100">
+                      Awaiting Review
+                    </Badge>
                   </div>
 
                   <div className="space-y-4 mb-8">
@@ -467,7 +637,7 @@ export default function ProcessTrackerPage() {
                         AI Assessment Summary
                       </h4>
                       <p className="text-slate-600 leading-relaxed bg-purple-50 p-4 rounded-lg border border-purple-100">
-                        {candidate.interviewFeedback}
+                        {candidate.interviewFeedback || candidate.summary || "Awaiting automated feedback."}
                       </p>
                     </div>
 
@@ -490,11 +660,18 @@ export default function ProcessTrackerPage() {
                   </div>
 
                   <div className="mt-auto flex gap-4">
-                    <Button variant="outline" className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700">
+                    <Button
+                      variant="outline"
+                      className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                      onClick={() => handleRejectAfterInterview(candidate.matchId)}
+                    >
                       <ThumbsDown className="w-4 h-4 mr-2" />
                       Reject
                     </Button>
-                    <Button onClick={() => handleMakeOffer(candidate.id)} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white">
+                    <Button
+                      onClick={() => handleMakeOffer(candidate.matchId)}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
                       <ThumbsUp className="w-4 h-4 mr-2" />
                       Approve & Make Offer
                     </Button>
@@ -503,7 +680,7 @@ export default function ProcessTrackerPage() {
               </div>
             </Card>
           ))}
-          {interviews.length === 0 && (
+          {interviewReviews.length === 0 && (
             <div className="text-center py-12 text-slate-500 border-2 border-dashed rounded-xl">
               No interviews in progress.
             </div>
@@ -512,12 +689,58 @@ export default function ProcessTrackerPage() {
 
         {/* TAB 3: OFFER MANAGEMENT (Dynamic Bidding) */}
         <TabsContent value="offers" className="space-y-6">
-          {offers.map(candidate => {
-            const isWinning = (candidate.yourOffer || 0) > (candidate.marketOffer || 0);
-            const gap = (candidate.yourOffer || 0) - (candidate.marketOffer || 0);
+          {offerEntries.length > 0 && (
+            <div className="grid md:grid-cols-3 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Active offers</CardDescription>
+                  <CardTitle className="text-3xl">{offerSummary.count}</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-slate-500">
+                  Number of candidates currently in the offer stage.
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Average offer</CardDescription>
+                  <CardTitle className="text-3xl">
+                    {offerSummary.average > 0 ? offerSummary.average.toLocaleString() : "—"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-slate-500">
+                  Mean value of all offers you have sent.
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Market average</CardDescription>
+                  <CardTitle className="text-3xl">
+                    {offerSummary.marketAverage > 0 ? offerSummary.marketAverage.toLocaleString() : "No data"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-slate-500">
+                  Average of top competing offers for these candidates.
+                </CardContent>
+              </Card>
+            </div>
+          )}
+          {offerEntries.map(candidate => {
+            const marketOffer = candidate.marketOffer || 0;
+            const yourOffer = candidate.yourOffer || 0;
+            const isWinning = yourOffer > marketOffer;
+            const gap = yourOffer - marketOffer;
+            const offerCount = candidate.offerCount ?? 0;
+            const competitorAverage = candidate.averageCompetitorOffer ?? 0;
+
+            const statusLabel =
+              candidate.status === "offer_accepted"
+                ? "Accepted"
+                : candidate.status === "offer_rejected"
+                  ? "Rejected"
+                  : "Pending";
 
             return (
-              <Card key={candidate.id} className="border-2 border-slate-100 overflow-hidden">
+              <Card key={candidate.matchId} className="border-2 border-slate-100 overflow-hidden">
                 <CardHeader className="bg-slate-50/50 border-b border-slate-100">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-4">
@@ -527,11 +750,16 @@ export default function ProcessTrackerPage() {
                       </Avatar>
                       <div>
                         <CardTitle>{candidate.name}</CardTitle>
-                        <CardDescription>{candidate.role}</CardDescription>
+                        <CardDescription>
+                          {candidate.role} · {candidate.jobTitle || "Open role"}
+                        </CardDescription>
                       </div>
                     </div>
-                    <Badge variant={isWinning ? "default" : "destructive"} className={isWinning ? "bg-green-600" : ""}>
-                      {isWinning ? "Leading Offer" : "Outbid by Competitor"}
+                    <Badge
+                      variant={isWinning ? "default" : "destructive"}
+                      className={isWinning ? "bg-green-600" : ""}
+                    >
+                      {statusLabel} · {isWinning ? "Leading" : "Trailing"}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -543,7 +771,9 @@ export default function ProcessTrackerPage() {
                       <div className="flex justify-between items-center p-4 bg-red-50 rounded-xl border border-red-100">
                         <div>
                           <p className="text-sm font-medium text-red-600 mb-1">Market Top Offer</p>
-                          <p className="text-3xl font-bold text-red-700">${candidate.marketOffer?.toLocaleString()}</p>
+                          <p className="text-3xl font-bold text-red-700">
+                            {marketOffer > 0 ? `$${marketOffer.toLocaleString()}` : "No competing offers"}
+                          </p>
                         </div>
                         <TrendingUp className="w-8 h-8 text-red-300" />
                       </div>
@@ -551,16 +781,36 @@ export default function ProcessTrackerPage() {
                       <div className={`flex justify-between items-center p-4 rounded-xl border ${isWinning ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-200'}`}>
                         <div>
                           <p className={`text-sm font-medium mb-1 ${isWinning ? 'text-emerald-600' : 'text-slate-500'}`}>Your Current Offer</p>
-                          <p className={`text-3xl font-bold ${isWinning ? 'text-emerald-700' : 'text-slate-700'}`}>${candidate.yourOffer?.toLocaleString()}</p>
+                          <p className={`text-3xl font-bold ${isWinning ? 'text-emerald-700' : 'text-slate-700'}`}>
+                            ${yourOffer.toLocaleString()}
+                          </p>
+                          {candidate.offerMessage && (
+                            <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                              {candidate.offerMessage}
+                            </p>
+                          )}
                         </div>
                         {isWinning ? <CheckCircle2 className="w-8 h-8 text-emerald-300" /> : <AlertCircle className="w-8 h-8 text-slate-300" />}
                       </div>
 
-                      <div className="flex justify-between text-sm text-slate-500 px-2">
-                        <span>Gap</span>
-                        <span className={gap > 0 ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
-                          {gap > 0 ? "+" : ""}{gap.toLocaleString()}
-                        </span>
+                      <div className="grid grid-cols-3 gap-3 text-sm text-slate-500 px-2">
+                        <div>
+                          <p className="uppercase tracking-wide text-[11px] text-slate-400">Gap</p>
+                          <p className={gap > 0 ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
+                            {gap > 0 ? "+" : ""}
+                            {gap.toLocaleString()}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="uppercase tracking-wide text-[11px] text-slate-400">Competitors</p>
+                          <p className="font-semibold text-slate-700">{offerCount}</p>
+                        </div>
+                        <div>
+                          <p className="uppercase tracking-wide text-[11px] text-slate-400">Avg competitor</p>
+                          <p className="font-semibold text-slate-700">
+                            {competitorAverage > 0 ? `$${Math.round(competitorAverage).toLocaleString()}` : "N/A"}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
@@ -577,11 +827,17 @@ export default function ProcessTrackerPage() {
                             <Input
                               className="pl-10 h-11 text-lg"
                               placeholder="190,000"
-                              value={offerInput}
-                              onChange={(e) => setOfferInput(e.target.value)}
+                              value={offerDrafts[candidate.matchId] ?? ""}
+                              onChange={(e) =>
+                                setOfferDrafts((prev) => ({ ...prev, [candidate.matchId]: e.target.value }))
+                              }
                             />
                           </div>
-                          <Button size="lg" onClick={() => handleUpdateOffer(candidate.id)} className="bg-slate-900 text-white hover:bg-slate-800">
+                          <Button
+                            size="lg"
+                            onClick={() => handleUpdateOffer(candidate.matchId)}
+                            className="bg-slate-900 text-white hover:bg-slate-800"
+                          >
                             Update Offer
                           </Button>
                         </div>
@@ -590,17 +846,22 @@ export default function ProcessTrackerPage() {
                       <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-700 flex gap-2">
                         <Info className="w-5 h-5 flex-shrink-0" />
                         <p>
-                          AI Prediction: An offer of <span className="font-bold">$188,000</span> has a 85% chance of being accepted based on candidate&rsquo;s preferences.
+                          Competing with {offerCount} other offer(s). Average competitor offer:{" "}
+                          {competitorAverage > 0 ? (
+                            <span className="font-bold">${Math.round(competitorAverage).toLocaleString()}</span>
+                          ) : (
+                            <span className="font-bold">No data</span>
+                          )}
                         </p>
                       </div>
-                    </div>
 
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             );
           })}
-          {offers.length === 0 && (
+          {offerEntries.length === 0 && (
             <div className="text-center py-12 text-slate-500 border-2 border-dashed rounded-xl">
               No active offers.
             </div>
@@ -666,6 +927,55 @@ export default function ProcessTrackerPage() {
             <Button type="button" onClick={handleSubmitInterview} disabled={isScheduling}>
               {isScheduling && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save & Send
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={offerDialogOpen}
+        onOpenChange={(open) => {
+          setOfferDialogOpen(open);
+          if (!open) {
+            resetOfferDialog();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Send Offer</DialogTitle>
+            <DialogDescription>
+              Provide a numeric offer and an optional note to reach the candidate.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-slate-700">Amount</p>
+              <Input
+                placeholder="150000"
+                value={offerForm.amount}
+                onChange={(e) => setOfferForm((prev) => ({ ...prev, amount: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-slate-700">Message</p>
+              <Textarea
+                rows={3}
+                placeholder="Add a short note for the candidate (optional)"
+                value={offerForm.message}
+                onChange={(e) => setOfferForm((prev) => ({ ...prev, message: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <DialogClose asChild>
+              <Button type="button" variant="ghost" onClick={resetOfferDialog} disabled={isSubmittingOffer}>
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button type="button" onClick={submitOffer} disabled={isSubmittingOffer}>
+              {isSubmittingOffer && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Send Offer
             </Button>
           </DialogFooter>
         </DialogContent>

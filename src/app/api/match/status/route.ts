@@ -7,6 +7,10 @@ const ALLOWED_STATUSES: MatchStatus[] = [
   "candidate_interested",
   "matched",
   "interview_pending",
+  "interview_completed",
+  "offer_pending",
+  "offer_accepted",
+  "offer_rejected",
   "rejected",
   "rejected_by_candidate",
 ];

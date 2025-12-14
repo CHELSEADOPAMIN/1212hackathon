@@ -7,8 +7,9 @@ import { ObjectId } from "mongodb";
 
 const sanitizeInterview = (doc: unknown) => {
   if (!doc || typeof doc !== "object") return doc;
-  // @ts-expect-error - handle mongoose docs and plain objects
-  const plain = typeof doc.toObject === "function" ? doc.toObject() : doc;
+  const plain = typeof (doc as { toObject?: () => unknown }).toObject === "function"
+    ? (doc as { toObject: () => unknown }).toObject()
+    : doc;
   const interview = plain as { _id?: unknown };
   return {
     ...interview,
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
     const matchId = body?.matchId;
     const rawQuestions = Array.isArray(body?.questions) ? body.questions : [];
     const questions = rawQuestions
-      .map((q) => (typeof q === "string" ? q.trim() : ""))
+      .map((q: unknown) => (typeof q === "string" ? q.trim() : ""))
       .filter(Boolean);
 
     if (!matchId || questions.length === 0) {

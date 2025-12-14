@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, ChevronRight, Loader2, Mic, Sparkles, Video } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Loader2, Sparkles, Video } from "lucide-react";
 
 type InterviewDetail = {
   _id?: string;
@@ -286,9 +286,9 @@ export default function InterviewRoomPage() {
     );
   }
 
-  const isLastQuestion = currentQuestion >= questions.length - 1;
-  const questionText =
-    currentQuestion >= 0 && questions[currentQuestion] ? questions[currentQuestion] : "Please wait while we load the next question...";
+  const hasQuestions = questions.length > 0;
+  const isLastQuestion = hasQuestions && currentQuestion >= questions.length - 1;
+  const showWave = isSpeaking || isLoadingAudio;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 text-white">
@@ -321,59 +321,47 @@ export default function InterviewRoomPage() {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6 px-6 pb-8">
-        <Card className="bg-white/5 border-white/10 text-white shadow-2xl shadow-blue-500/10">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <Sparkles className="w-5 h-5 text-amber-400" />
-                  AI Interviewer
-                </CardTitle>
-              <Badge variant="outline" className="border-white/20 text-white">
-                {currentQuestion >= 0 ? `Question ${currentQuestion + 1}/${questions.length}` : "Preparing"}
-              </Badge>
-            </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="relative h-24 w-24">
-                <div className="absolute inset-0 rounded-full bg-blue-500/30 blur-2xl animate-pulse" />
-                <div className="absolute inset-2 rounded-full bg-blue-500/40 animate-ping" />
-                <div className="relative h-full w-full rounded-full bg-gradient-to-br from-blue-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                  <Mic className="w-8 h-8" />
-                </div>
-              </div>
-              <div className="flex-1">
-                <p className="text-sm text-slate-300">AI is reading the question. Click 'Next' after answering.</p>
-                <p className="text-xs text-slate-400 mt-1">
-                  {isSpeaking || isLoadingAudio ? "Playing audio..." : "Ready when you are"}
-                </p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white/10 border border-white/10 min-h-[140px] flex items-center">
-              <p className="text-lg leading-relaxed">{questionText}</p>
+        <Card className="bg-black/60 border-white/10 text-white shadow-2xl shadow-blue-500/10 overflow-hidden">
+          <CardContent className="relative flex flex-col items-center justify-center gap-10 min-h-[520px]">
+            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_30%_20%,rgba(56,189,248,0.12),transparent_38%),radial-gradient(circle_at_70%_80%,rgba(16,185,129,0.08),transparent_35%)]" />
+            <div className="relative h-48 w-48 flex items-center justify-center">
+              <div
+                className={`absolute inset-0 rounded-full bg-blue-500/25 blur-3xl transition-opacity duration-300 ${
+                  showWave ? "opacity-80" : "opacity-0"
+                }`}
+              />
+              <div
+                className={`absolute inset-4 rounded-full border border-white/10 transition-all duration-300 ${
+                  showWave ? "animate-[ping_1.8s_ease-in-out_infinite]" : ""
+                }`}
+              />
+              <div
+                className={`absolute inset-8 rounded-full bg-gradient-to-br from-blue-500 via-sky-400 to-emerald-400 opacity-90 ${
+                  showWave ? "animate-[pulse_2.2s_ease-in-out_infinite]" : ""
+                }`}
+              />
+              <div className="relative h-24 w-24 rounded-full bg-gradient-to-br from-sky-500 via-blue-600 to-emerald-500 shadow-lg shadow-blue-500/30" />
             </div>
 
             <Button
-              size="lg"
+              size="icon"
+              aria-label={isLastQuestion ? "提交" : "下一题"}
               disabled={
                 interview.status !== "scheduled" || isLoadingAudio || isSpeaking || isSubmitting || !questions.length
               }
               onClick={handleNext}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white"
+              className="h-16 w-16 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white backdrop-blur transition"
             >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Submitting...
-                    </>
-                  ) : (
-                    <>
-                      {isLastQuestion ? "Submit & Finish" : "Next Question"}
-                      <ChevronRight className="w-4 h-4 ml-2" />
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
+              {isSubmitting ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : isLastQuestion ? (
+                <Check className="h-5 w-5" />
+              ) : (
+                <ChevronRight className="h-5 w-5" />
+              )}
+            </Button>
+          </CardContent>
+        </Card>
 
         <Card className="bg-white/5 border-white/10 text-white shadow-2xl shadow-emerald-500/10">
           <CardHeader>

@@ -8,22 +8,28 @@ import { ObjectId } from "mongodb";
 const toIdString = (value: unknown) => {
   if (!value) return "";
   if (typeof value === "string") return value;
-  // @ts-expect-error - handle ObjectId or other objects
-  if (typeof value === "object" && typeof value.toString === "function") return value.toString();
+  if (typeof value === "object" && value !== null && "toString" in value) return value.toString();
   return String(value);
 };
 
-const formatInterview = (item: any) => {
+type InterviewLike = {
+  _id?: unknown;
+  matchId?: unknown;
+  toObject?: () => Record<string, unknown>;
+} | null | undefined;
+
+const formatInterview = (item: InterviewLike) => {
   if (!item) return item;
   const base = typeof item.toObject === "function" ? item.toObject() : item;
+  const normalized = base as { _id?: unknown; matchId?: unknown };
   return {
     ...base,
-    _id: toIdString(base._id),
-    matchId: toIdString(base.matchId),
+    _id: toIdString(normalized._id),
+    matchId: toIdString(normalized.matchId),
   };
 };
 
-const MATCH_FILTER = ["matched", "interview_pending"] as const;
+const MATCH_FILTER = ["matched", "interview_pending", "interview_completed"] as const;
 
 export async function GET(req: NextRequest) {
   try {
@@ -102,13 +108,14 @@ export async function GET(req: NextRequest) {
 
     const interviews = await Interview.find({
       matchId: { $in: Array.from(matchIdSet) },
-      status: "scheduled",
+      status: { $in: ["scheduled", "completed"] },
     })
       .sort({ createdAt: -1 })
       .lean();
 
     const data = interviews.map((interview) => {
       const formatted = formatInterview(interview);
+      if (!formatted) return null;
       const match = matchMap.get(formatted.matchId);
       return {
         ...formatted,
@@ -120,7 +127,7 @@ export async function GET(req: NextRequest) {
             }
           : null,
       };
-    });
+    }).filter(Boolean);
 
     return NextResponse.json({ success: true, data });
   } catch (error: unknown) {

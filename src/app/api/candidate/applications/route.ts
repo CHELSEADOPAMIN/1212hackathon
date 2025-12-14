@@ -7,6 +7,10 @@ const CANDIDATE_STATUSES: MatchStatus[] = [
   "company_interested",
   "matched",
   "interview_pending",
+  "interview_completed",
+  "offer_pending",
+  "offer_accepted",
+  "offer_rejected",
 ];
 
 export async function GET(req: NextRequest) {

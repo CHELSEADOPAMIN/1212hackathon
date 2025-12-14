@@ -4,6 +4,8 @@ import { promises as fs } from "fs";
 
 import dbConnect from "@/lib/db/mongodb";
 import { Interview } from "@/lib/db/models";
+import { getMatchesCollection, updateMatchStatus } from "@/lib/matches";
+import { ObjectId } from "mongodb";
 
 export const runtime = "nodejs";
 
@@ -37,6 +39,33 @@ export async function POST(req: NextRequest) {
     interview.status = "completed";
     interview.recordingUrl = `/uploads/interviews/${interviewId}.webm`;
     await interview.save();
+
+    const normalizedMatchId =
+      typeof interview.matchId === "string"
+        ? interview.matchId
+        : interview.matchId?.toString?.();
+
+    if (normalizedMatchId) {
+      try {
+        if (ObjectId.isValid(normalizedMatchId)) {
+          await updateMatchStatus(normalizedMatchId, "interview_completed");
+        } else {
+          const collection = await getMatchesCollection();
+          await collection.findOneAndUpdate(
+            { _id: normalizedMatchId as unknown as ObjectId },
+            {
+              $set: {
+                status: "interview_completed",
+                updatedAt: new Date(),
+                isSoftDeleted: false,
+              },
+            }
+          );
+        }
+      } catch (statusError) {
+        console.warn("Interview completed but failed to update match status:", statusError);
+      }
+    }
 
     return NextResponse.json({
       success: true,

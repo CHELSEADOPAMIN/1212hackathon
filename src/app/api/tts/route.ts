@@ -44,7 +44,9 @@ export async function POST(req: NextRequest) {
       throw lastError || new Error("TTS generation failed");
     }
 
-    return new NextResponse(audioBuffer, {
+    const audioBytes = new Uint8Array(audioBuffer);
+
+    return new NextResponse(audioBytes, {
       status: 200,
       headers: {
         "Content-Type": mediaType,

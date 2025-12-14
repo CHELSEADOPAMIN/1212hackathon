@@ -77,8 +77,19 @@ export type MatchStatus =
   | "candidate_interested"
   | "matched"
   | "interview_pending"
+  | "interview_completed"
+  | "offer_pending"
+  | "offer_accepted"
+  | "offer_rejected"
   | "rejected"
   | "rejected_by_candidate";
+
+export interface MatchOffer {
+  amount: number;
+  currency: string;
+  message?: string;
+  createdAt: Date;
+}
 
 export interface MatchJobSnapshot {
   title?: string;
@@ -108,6 +119,7 @@ export interface Match {
   createdAt: Date;
   updatedAt: Date;
   isSoftDeleted?: boolean;
+  offer?: MatchOffer;
   jobSnapshot?: MatchJobSnapshot;
   candidateSnapshot?: MatchCandidateSnapshot;
 }

@@ -22,6 +22,12 @@ type IdLike = string | number | { toString(): string } | null | undefined;
 type MatchRecord = {
   _id?: string;
   status: MatchStatus;
+  offer?: {
+    amount?: number;
+    currency?: string;
+    message?: string;
+    createdAt?: string;
+  };
   job?: {
     title?: string;
     company?: string;
@@ -53,7 +59,10 @@ interface OfferCard {
   id: string;
   company: string;
   role: string;
-  salary: string;
+  salaryLabel: string;
+  amount?: number;
+  currency?: string;
+  message?: string;
   expiresLabel: string;
 }
 
@@ -103,6 +112,13 @@ export default function ApplicationsPage() {
   const [interviewLoading, setInterviewLoading] = useState(true);
   const router = useRouter();
 
+  const formatOfferValue = (amount?: number, currency?: string) => {
+    if (typeof amount !== "number") return "";
+    const money = amount.toLocaleString();
+    const unit = currency || "USD";
+    return `${unit} ${money}`;
+  };
+
   const candidateId = useMemo(() => {
     if (typeof window === "undefined") return "";
     const savedProfile = localStorage.getItem("userProfile");
@@ -130,20 +146,31 @@ export default function ApplicationsPage() {
         const matches: MatchRecord[] = data.data || [];
 
         const nextOffers = matches
-          .filter((m) => m.status === "matched")
+          .filter((m) => m.status === "offer_pending")
           .map((m) => {
             const job = getJobInfo(m);
+            const amount = typeof m.offer?.amount === "number" ? m.offer.amount : undefined;
+            const currency = m.offer?.currency || "USD";
+            const salaryLabel = formatOfferValue(amount, currency) || job.salary || "TBD";
             return {
               id: toStringId(m._id),
               company: job.company || "Hiring Company",
               role: job.title || "Open Role",
-              salary: job.salary || "TBD",
-              expiresLabel: buildExpiryLabel(m.updatedAt),
+              salaryLabel,
+              amount,
+              currency,
+              message: m.offer?.message,
+              expiresLabel: buildExpiryLabel(m.offer?.createdAt || m.updatedAt),
             } as OfferCard;
           });
 
         const nextPending = matches
-          .filter((m) => m.status === "candidate_interested" || m.status === "company_interested")
+          .filter((m) =>
+            m.status === "candidate_interested" ||
+            m.status === "company_interested" ||
+            m.status === "matched" ||
+            m.status === "interview_pending"
+          )
           .map((m) => {
             const job = getJobInfo(m);
             return {
@@ -229,15 +256,43 @@ export default function ApplicationsPage() {
   };
 
   const handleStartInterview = (interview: InterviewCard) => {
-    if (interview.status !== "scheduled") {
+    const isSubmitted =
+      interview.matchStatus === "interview_completed" || interview.status === "completed";
+    const isReady = interview.status === "scheduled" && !isSubmitted;
+
+    if (!isReady) {
       toast.info("Interview not available", {
-        description: interview.recordingUrl
+        description: isSubmitted
           ? "Interview recording submitted; HR is reviewing it."
           : "Please wait for HR to prepare the interview.",
       });
       return;
     }
+
     router.push(`/interview/${interview.id}`);
+  };
+
+  const handleOfferResponse = async (matchId: string, nextStatus: MatchStatus) => {
+    try {
+      const res = await fetch("/api/match/status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ matchId, status: nextStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to update offer");
+      }
+
+      setOffers((prev) => prev.filter((item) => item.id !== matchId));
+      toast.success(
+        nextStatus === "offer_accepted" ? "Offer accepted" : "Offer declined",
+        { description: "We have updated your application status." }
+      );
+    } catch (error) {
+      console.error("Offer update error:", error);
+      toast.error("Unable to update offer", { description: (error as Error).message });
+    }
   };
 
   return (
@@ -279,25 +334,39 @@ export default function ApplicationsPage() {
                     <Badge className="bg-green-600 hover:bg-green-700">Offer</Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <FileText className="w-5 h-5 text-green-700" />
-                    <span className="text-lg font-semibold text-green-800">{offer.salary}</span>
+              <CardContent className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <FileText className="w-5 h-5 text-green-700" />
+                  <div>
+                    <p className="text-lg font-semibold text-green-800">
+                      {offer.salaryLabel}
+                    </p>
+                    {offer.message && (
+                      <p className="text-sm text-green-700/80 mt-1 line-clamp-2">{offer.message}</p>
+                    )}
                   </div>
-                  <div className="flex items-center gap-3 text-sm text-green-700">
-                    <CalendarClock className="w-4 h-4" />
-                    <span>{offer.expiresLabel}</span>
-                  </div>
-                </CardContent>
-                <CardFooter className="flex gap-3">
-                  <Button variant="outline" className="flex-1 border-green-200 hover:bg-green-100 text-green-800">
-                    View Invitation
-                  </Button>
-                  <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white">
-                    Accept Offer
-                  </Button>
-                </CardFooter>
-              </Card>
+                </div>
+                <div className="flex items-center gap-3 text-sm text-green-700">
+                  <CalendarClock className="w-4 h-4" />
+                  <span>{offer.expiresLabel}</span>
+                </div>
+              </CardContent>
+              <CardFooter className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1 border-green-200 hover:bg-green-100 text-green-800"
+                  onClick={() => handleOfferResponse(offer.id, "offer_rejected")}
+                >
+                  Decline
+                </Button>
+                <Button
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => handleOfferResponse(offer.id, "offer_accepted")}
+                >
+                  Accept Offer
+                </Button>
+              </CardFooter>
+            </Card>
             ))}
           </div>
         )}
@@ -320,7 +389,8 @@ export default function ApplicationsPage() {
         ) : (
           <div className="grid md:grid-cols-2 gap-4">
             {interviews.map((job) => {
-              const isReady = job.status === "scheduled";
+              const isSubmitted = job.status === "completed" || job.matchStatus === "interview_completed";
+              const isReady = job.status === "scheduled" && !isSubmitted;
               return (
                 <Card key={job.id} className="border-2 border-blue-100 shadow-md">
                   <CardHeader className="flex items-center justify-between">
@@ -336,7 +406,7 @@ export default function ApplicationsPage() {
                           : "bg-emerald-100 text-emerald-700"
                       }
                     >
-                      {isReady ? "Ready" : "Submitted"}
+                      {isReady ? "Ready" : isSubmitted ? "Submitted" : "Pending"}
                     </Badge>
                   </CardHeader>
                   <CardContent>
@@ -347,7 +417,11 @@ export default function ApplicationsPage() {
                       <div>
                         <p className="font-semibold text-slate-900">{job.time || "To be scheduled"}</p>
                         <p className="text-sm text-slate-500">
-                          {job.recordingUrl ? "Recording uploaded" : job.type}
+                          {isSubmitted
+                            ? "Awaiting HR review"
+                            : job.recordingUrl
+                              ? "Recording uploaded"
+                              : job.type}
                         </p>
                         {job.matchStatus && (
                           <p className="text-xs text-slate-400">
@@ -362,7 +436,7 @@ export default function ApplicationsPage() {
                       disabled={!isReady}
                       onClick={() => handleStartInterview(job)}
                     >
-                      {isReady ? "Start AI Interview" : "Awaiting Review"}
+                      {isReady ? "Start AI Interview" : "Pending Review"}
                       <ChevronRight className="w-4 h-4 ml-2" />
                     </Button>
                   </CardContent>
