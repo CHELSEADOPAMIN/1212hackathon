@@ -18,7 +18,7 @@ interface Repo {
 
 export async function POST(req: Request) {
   try {
-    const { githubUrl } = await req.json();
+    const { githubUrl, resumeText } = await req.json();
 
     // 1. 提取用户名 (简单正则: github.com/username)
     const match = githubUrl.match(/github\.com\/([^\/]+)/);
@@ -75,26 +75,35 @@ export async function POST(req: Request) {
     }));
 
     // 4. 构建 Prompt
+    
+    // I will replace the top part first.
+    
     const prompt = `
-      You are an expert AI Tech Recruiter. I will give you data about a candidate's GitHub repositories.
+      You are an expert AI Tech Recruiter. I will give you data about a candidate's GitHub repositories and their Resume content.
       
       Candidate Username: "${username}"
       GitHub URL: "${githubUrl}"
+      Resume Content:
+      """
+      ${resumeText || "No resume provided."}
+      """
       
       Analyzed Repositories (Top 15 Active & Valid):
       ${JSON.stringify(repoSummary, null, 2)}
       
       Tasks:
-      1. Analyze their tech stack based on the "lang" field and project descriptions. 
+      1. Analyze their tech stack based on the "lang" field, project descriptions, and Resume.
          - Give higher weight to "Original" projects.
          - If they have active "Contribution (Fork)" projects, acknowledge them as an "Open Source Contributor".
-      2. Generate a realistic candidate profile in JSON.
+      2. Extract ALL Professional Experience from the Resume. Do not skip any role.
+      3. For each experience entry, generate a detailed description of AT LEAST 3 bullet points or sentences, summarizing their key achievements, technologies used, and impact.
+      4. Generate a realistic candidate profile in JSON.
 
       Output JSON Format:
       {
-        "name": "Realistic Name based on username",
+        "name": "Realistic Name based on username or resume",
         "role": "Suggested Job Title (e.g. Senior Frontend Engineer)",
-        "summary": "2-sentence professional summary in Chinese. Mention their open source contributions if any.",
+        "summary": "2-sentence professional summary in English. Mention their open source contributions if any.",
         "skills": [
           {"subject": "Skill1", "A": 90}, 
           {"subject": "Skill2", "A": 85}, 
@@ -102,14 +111,22 @@ export async function POST(req: Request) {
           {"subject": "Skill4", "A": 75}, 
           {"subject": "Skill5", "A": 70}
         ],
-        "matchReason": "A one-line reason why they are a top talent (in Chinese)."
+        "experiences": [
+          {
+            "role": "Job Title",
+            "company": "Company Name",
+            "period": "e.g. 2021 - Present",
+            "description": "Detailed summary (at least 3 lines/sentences)..."
+          }
+        ],
+        "matchReason": "A one-line reason why they are a top talent (in English)."
       }
 
       RETURN ONLY THE RAW JSON. NO MARKDOWN.
     `;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o", // 使用稳定的 gpt-4o，如果你的环境支持 gpt-5.1 请自行修改
+      model: "gpt-5.1", // Updated to gpt-5.1 as requested
       messages: [
         { role: "system", content: "You are a helpful assistant that outputs raw JSON." },
         { role: "user", content: prompt },

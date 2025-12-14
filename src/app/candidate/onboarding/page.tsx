@@ -16,6 +16,7 @@ interface AnalysisResult {
   role: string;
   summary: string;
   skills: { subject: string; A: number }[];
+  experiences: { role: string; company: string; period: string; description: string }[];
   matchReason: string;
 }
 
@@ -28,6 +29,7 @@ export default function OnboardingPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingText, setLoadingText] = useState("Initializing analysis...");
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -128,6 +130,35 @@ export default function OnboardingPage() {
       setStep(1);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleEnterTalentPool = async () => {
+    if (!result) return;
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/candidate/profile/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...result, githubUrl }),
+      });
+
+      if (res.ok) {
+        const savedData = await res.json();
+        // Update local storage with the full profile including _id from DB
+        if (savedData.success && savedData.data) {
+           localStorage.setItem('userProfile', JSON.stringify(savedData.data));
+        }
+        router.push('/candidate/dashboard');
+      } else {
+        const errorData = await res.json();
+        alert(`Failed to save profile: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error("Save error:", error);
+      alert("Error saving profile. Please check your connection.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -316,12 +347,26 @@ export default function OnboardingPage() {
           </CardContent>
 
           <CardFooter className="p-6 bg-slate-50/50 border-t flex justify-between items-center">
-            <Button variant="ghost" onClick={() => setStep(1)}>
+            <Button variant="ghost" onClick={() => setStep(1)} disabled={isSaving}>
               Retry
             </Button>
-            <Button size="lg" className="bg-blue-600 hover:bg-blue-700" onClick={() => router.push('/candidate/dashboard')}>
-              Enter Talent Pool
-              <ArrowRight className="ml-2 w-4 h-4" />
+            <Button 
+              size="lg" 
+              className="bg-blue-600 hover:bg-blue-700" 
+              onClick={handleEnterTalentPool}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  Enter Talent Pool
+                  <ArrowRight className="ml-2 w-4 h-4" />
+                </>
+              )}
             </Button>
           </CardFooter>
         </Card>

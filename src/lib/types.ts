@@ -8,12 +8,21 @@ export interface CandidateSkill {
   category?: string;
 }
 
+export interface Experience {
+  id?: string;
+  role: string;
+  company: string;
+  period: string;
+  description: string;
+}
+
 export interface Candidate {
   _id?: ObjectId;
   name: string;
   role: string;
   summary: string;
   skills: CandidateSkill[];
+  experiences?: Experience[];
   email?: string;
   githubUrl?: string;
   matchReason?: string;
@@ -38,6 +47,7 @@ export interface CandidateProfileInput {
   role?: string;
   summary?: string;
   skills?: Array<string | CandidateSkill>;
+  experiences?: Experience[];
   location?: string;
 }
 

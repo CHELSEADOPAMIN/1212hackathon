@@ -88,18 +88,70 @@ export default function OpportunitiesPage() {
 
   const currentJob = jobs[currentIndex];
 
-  const handleDecision = (dir: 'left' | 'right') => {
+  const handleDecision = async (dir: 'left' | 'right') => {
+    // 1. Set direction to trigger animation immediately
     setDirection(dir);
 
-    setTimeout(() => {
-      if (dir === 'right') {
-        toast.success("Saved to Pending List", {
-          description: "You can view this in the Applications tab.",
+    // 2. Prepare for next card (animation delay)
+    const nextCardDelay = 300;
+
+    // If swiped right, we need to save to DB
+    if (dir === 'right' && currentJob) {
+      try {
+        const savedProfile = localStorage.getItem('userProfile');
+        if (!savedProfile) {
+          toast.error("Profile not found. Please log in again.");
+          return;
+        }
+
+        const profile = JSON.parse(savedProfile);
+        console.log("Saving Application:", { candidateId: profile._id, jobId: currentJob.id });
+
+        if (!profile._id) {
+          toast.error("Invalid profile data. Missing ID.");
+          return;
+        }
+
+        const res = await fetch('/api/application/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            candidateId: profile._id,
+            jobId: currentJob.id
+          }),
         });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+           // Success!
+           setTimeout(() => {
+            toast.success("Saved to Pending List", {
+              description: "You can view this in the Applications tab.",
+            });
+          }, nextCardDelay);
+        } else {
+          // API returned error
+          console.error("Save failed:", data);
+          toast.error("Failed to save application", {
+            description: data.error || "Unknown error"
+          });
+        }
+
+      } catch (err) {
+        console.error("Network/System error:", err);
+        toast.error("Network error. Could not save application.");
       }
+    } else {
+       // Swiped left (pass), just show feedback or nothing
+       // Optional: toast.info("Passed on job");
+    }
+
+    // 3. Move to next card after animation
+    setTimeout(() => {
       setCurrentIndex((prev) => prev + 1);
       setDirection(null);
-    }, 300);
+    }, nextCardDelay);
   };
 
   // 动画 Class 计算

@@ -19,11 +19,16 @@ export function buildCandidateProfileText(profile: CandidateProfileInput) {
     .filter(Boolean)
     .join(", ");
 
+  const experienceText = (profile.experiences || [])
+    .map(exp => `${exp.role} at ${exp.company}: ${exp.description}`)
+    .join(". ");
+
   return [
     profile.name ? `Name: ${profile.name}` : "",
     profile.role ? `Role: ${profile.role}` : "",
     profile.summary ? `Summary: ${profile.summary}` : "",
     skillNames ? `Skills: ${skillNames}` : "",
+    experienceText ? `Experience: ${experienceText}` : "",
     profile.location ? `Location: ${profile.location}` : "",
   ]
     .filter(Boolean)

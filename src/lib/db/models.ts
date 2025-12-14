@@ -34,11 +34,19 @@ export interface ISkill {
   category?: string;
 }
 
+export interface IExperience {
+  role: string;
+  company: string;
+  period: string;
+  description: string;
+}
+
 export interface ICandidate extends Document {
   name: string;
   role: string;
   summary: string;
   skills: ISkill[];
+  experiences?: IExperience[];
   email?: string;
   githubUrl?: string;
   matchReason?: string; // For UI display purposes
@@ -56,12 +64,39 @@ const CandidateSchema: Schema = new Schema({
       category: { type: String },
     },
   ],
+  experiences: [
+    {
+      role: { type: String },
+      company: { type: String },
+      period: { type: String },
+      description: { type: String },
+    }
+  ],
   email: { type: String },
   githubUrl: { type: String },
   matchReason: { type: String },
   embedding: { type: [Number], required: true, index: false },
 });
 
+// --- Application Model ---
+
+export interface IApplication extends Document {
+  candidateId: mongoose.Types.ObjectId;
+  jobId: mongoose.Types.ObjectId;
+  status: 'pending' | 'interview' | 'offer' | 'rejected';
+  appliedAt: Date;
+  updatedAt: Date;
+}
+
+const ApplicationSchema: Schema = new Schema({
+  candidateId: { type: Schema.Types.ObjectId, ref: 'Candidate', required: true },
+  jobId: { type: Schema.Types.ObjectId, ref: 'Job', required: true },
+  status: { type: String, enum: ['pending', 'interview', 'offer', 'rejected'], default: 'pending' },
+  appliedAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+
 // Avoid OverwriteModelError
 export const Job: Model<IJob> = mongoose.models.Job || mongoose.model<IJob>('Job', JobSchema);
 export const Candidate: Model<ICandidate> = mongoose.models.Candidate || mongoose.model<ICandidate>('Candidate', CandidateSchema);
+export const Application: Model<IApplication> = mongoose.models.Application || mongoose.model<IApplication>('Application', ApplicationSchema);

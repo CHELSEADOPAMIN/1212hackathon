@@ -36,6 +36,7 @@ interface UserProfile {
   role: string;
   summary: string;
   skills: { subject: string; A: number }[];
+  experiences?: Experience[];
 }
 
 export default function MyProfilePage() {
@@ -43,26 +44,9 @@ export default function MyProfilePage() {
     name: "Alex Chen",
     role: "Senior Full Stack Developer",
     summary: "Alex demonstrates exceptional proficiency in full-stack development...",
-    skills: DEFAULT_SKILLS
+    skills: DEFAULT_SKILLS,
+    experiences: []
   });
-
-  // 读取 Onboarding 产生的数据
-  useEffect(() => {
-    const savedProfile = localStorage.getItem('userProfile');
-    if (savedProfile) {
-      try {
-        const parsed = JSON.parse(savedProfile);
-        setProfile({
-          name: parsed.name,
-          role: parsed.role,
-          summary: parsed.summary,
-          skills: parsed.skills
-        });
-      } catch (e) {
-        console.error("Failed to load profile", e);
-      }
-    }
-  }, []);
 
   // 状态管理：Job Preferences
   const [preferences, setPreferences] = useState({
@@ -90,6 +74,35 @@ export default function MyProfilePage() {
       description: "Built the core product dashboard using React and TypeScript. Collaborated closely with design team to implement pixel-perfect UI."
     }
   ]);
+
+  // 读取 Onboarding 产生的数据
+  useEffect(() => {
+    const savedProfile = localStorage.getItem('userProfile');
+    if (savedProfile) {
+      try {
+        const parsed = JSON.parse(savedProfile);
+        setProfile({
+          name: parsed.name,
+          role: parsed.role,
+          summary: parsed.summary,
+          skills: parsed.skills,
+          experiences: parsed.experiences
+        });
+        
+        // If we have experiences from AI, override the mock ones
+        if (parsed.experiences && parsed.experiences.length > 0) {
+          // Assign IDs if missing
+          const experiencesWithIds = parsed.experiences.map((exp: any, index: number) => ({
+            ...exp,
+            id: exp.id || `ai-${index}`
+          }));
+          setExperiences(experiencesWithIds);
+        }
+      } catch (e) {
+        console.error("Failed to load profile", e);
+      }
+    }
+  }, []);
 
   // 编辑/新增表单状态
   const [isDialogOpen, setIsDialogOpen] = useState(false);
